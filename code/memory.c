@@ -21,13 +21,15 @@ void load_file(const char * filename);      //читаем данные из ф�
 
 void test_mem();        //тесты работы с памятью
 
-int main() {
+int main (int argc, char * argv[])  {
+    const char * filename = (argc > 1) ? argv[1] : "data.txt";      //по-умолчанию используем файл data.txt
+    fprintf(stderr, "Загрузка данных из файла: %s\n", filename);    //печатаем какой именно файл мы загрузили
 
     //test_mem();
 
     //load_data();
 
-    load_file("data.txt");
+    load_file(filename);
 
     mem_dump(0x40, 20);
     printf("\n");
@@ -36,8 +38,7 @@ int main() {
     return 0;
 }
 
-void test_mem()
-{
+void test_mem() {
     Address a;
     Byte b0, b1, bres;
     Word w, wres;
@@ -146,15 +147,15 @@ void mem_dump(Address adr, int size) {
 void load_file(const char * filename) {
     FILE * fin = fopen(filename, "r");
 
-    if (fin == NULL) {      //проверяем на ошибку открытия файла
-        perror(filename);   //печатаем имя файла и причину ошибки
-        exit(errno);        //завершаем программу с кодом ошибки
+    if (fin == NULL) {      
+        perror(filename);   
+        exit(errno);        
     }
 
     unsigned int block_adr;
     int n;
     
-    while (fscanf(fin, "%x %x", &block_adr, &n) == 2) {       //сперва читаем адрес блока и количество записываемых байт
+    while (fscanf(fin, "%x %x", &block_adr, &n) == 2) {       
         for (int i = 0; i < n; i++) {
             unsigned int byte_value;
             if (fscanf(fin, "%x", &byte_value) != 1) {
@@ -162,7 +163,9 @@ void load_file(const char * filename) {
                 fclose(fin);
                 exit(1);
             }
-            b_write((Address)(block_adr + i), (Byte)(byte_value));      //записываем значение в память
+            b_write((Address)(block_adr + i), (Byte)(byte_value));      
         }
     }
+    
+    fclose(fin);
 }
