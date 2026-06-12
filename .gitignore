@@ -1,2 +1,11 @@
+#folders
+
 manuals/*
 reference_emulator_pdp11/*
+test/*
+.vscode/*
+
+#files
+
+*.exe
+*.o
