@@ -18,7 +18,7 @@ typedef enum {      //уровни логирования
     LOG_DEBUG
 } Log_level;
 
-static Log_level current_log_level = LOG_INFO;  //LOG_INFO - уровень логирования по умолчанию
+static Log_level current_log_level = LOG_OFF;           //по умолчанию логи отключены
 static const char* level_strings[] = {"LOG_OFF", "LOG_ERROR", "LOG_INFO", "LOG_TRACE", "LOG_DEBUG"}; //наглядное оформление вывода логов
 
 Byte mem[MEMSIZE];          // память
@@ -47,7 +47,6 @@ int main (int argc, char * argv[])  {
     load_file(filename);
 
     mem_dump(0x40, 20);
-    printf("\n");
     mem_dump(0x200, 0x26);
 
     return 0;
@@ -57,6 +56,8 @@ void test_mem() {
     Address a;
     Byte b0, b1, bres;
     Word w, wres;
+    signed char signed_b0, signed_b1, signed_bres;
+    signed short signed_w;
 
     print_log(LOG_INFO, "Запуск проверки памяти\n");
 
@@ -116,11 +117,43 @@ void test_mem() {
     assert(b0 == 0xE1);
     assert(b1 == 0xCD);
 
+    //проверка отрицательных чисел (старший бит равен 1):
+
+    //пишем и читаем отрицательный байт
+    print_log(LOG_INFO, "Пишем и читаем отрицательный байт\n");
+    a = 1; 
+    signed_b0 = -123; 
+    b_write(a, (Byte)signed_b0);
+    signed_bres = (signed char)b_read(a);
+    print_log(LOG_TRACE, "a = %06o signed_b0 = %d signed_bres = %d\n", a, signed_b0, signed_bres);
+    assert(signed_b0 == signed_bres);
+
+    //пишем отрицательное слово, читаем побайтово (проверка Little-Endian)
+    print_log(LOG_INFO, "Пишем отрицательное слово, читаем побайтово\n");
+    a = 10;
+    signed_w = -3678;    //0xF1A2
+    w_write(a, (Word)signed_w);
+    signed_b0 = (signed char)b_read(a);       //должен быть младший байт: 0xA2 (-94)
+    signed_b1 = (signed char)b_read(a + 1);   //должен быт старший байт: 0xF1 (-15)
+    print_log(LOG_TRACE, "a = %06o signed_w = %04x signed_b1 = %d, signed_b0 = %d\n", a, (Word)signed_w, signed_b1, signed_b0);
+    assert(signed_b0 == (signed char)0xA2);
+    assert(signed_b1 == (signed char)0xF1);
+
+    /*
+    //тесты, вызывающие падение программы:
+    print_log(LOG_INFO, "Пишем слово по нечетному адресу\n");
+    w_write(1, 0x1234); 
+
+    print_log(LOG_INFO, "Читаем слово по нечетному адресу\n");
+    w_read(3);
+    */
+
     print_log(LOG_INFO, "Проверка памяти окончена, ошибок не найдено\n");
 
 }
 
 void b_write (Address adr, Byte val) {
+    assert(adr < MEMSIZE);                           //проверка, что адрес не выходит за границы памяти
     mem[adr] = val;
 }
 
@@ -130,12 +163,16 @@ Byte b_read (Address adr) {
 
 void w_write (Address adr, Word val) {
     assert((adr & 1) == 0);                         //проверка, что адрес слова четный
+    assert(adr < MEMSIZE - 1);                      //проверка, что адрес не выходит за границы памяти
+
     mem[adr] = (Byte)(val & 0xFF);                  //младший байт (остаток от деления на 256)   
     mem[adr + 1] = (Byte)((val >> 8) & 0xFF);       //старший байт (сдвиг на 8 бит вправо)
 }
 
-Word w_read (Address a)
-{
+Word w_read (Address a) {
+    assert((a & 1) == 0);                         //проверка, что адрес слова четный
+    assert(a < MEMSIZE - 1);                      //проверка, что адрес не выходит за границы памяти
+
     Word w = mem[a + 1];
     w = w << 8;
     w = w | mem[a];
@@ -143,6 +180,8 @@ Word w_read (Address a)
 }
 
 void mem_dump(Address adr, int size) {
+    print_log(LOG_INFO, "Дамп памяти по адресу %06o размером %d байт:\n", adr, size);
+
     for (Address a = adr; a < adr + size; a += 2) { //идем только по четным адресам (а + 2)
         Word w = w_read(a);
         print_log(LOG_TRACE, "%06o: %06o %04x\n", a, w, w);       //вывод по формату "адрес: восьмеричное_слово шестнадцатеричное_слово"
@@ -150,15 +189,22 @@ void mem_dump(Address adr, int size) {
 }
 
 int load_data(FILE * file) {
-    
     unsigned int block_adr;
     int n;
     
-    while (fscanf(file, "%x %x", &block_adr, &n) == 2) {       //сперва читаем адрес блока и количество записываемых байт
+    while (fscanf(file, "%x %x", &block_adr, &n) == 2) {    //сперва читаем адрес блока и количество записываемых байт
         for (int i = 0; i < n; i++) {
             unsigned int byte_value;
+
             if (fscanf(file, "%x", &byte_value) != 1)       //читаем значение байта
-                 return 1;
+                return 1;                                   //код ошибки 1: ошибка чтения
+
+            if (byte_value > 0xFF)                          //проверяем, что читаем именно байт
+                return 2;                                   //код ошибки 2: некорректные данные в файле
+
+            if ((block_adr + i) >= MEMSIZE)                 //проверка на переполнение памяти
+                return 3;                                   //код ошибки 3: адрес памяти вне допустимого значения
+
             b_write((Address)(block_adr + i), (Byte)(byte_value));      //записываем значение в память
         }
     }
@@ -175,13 +221,33 @@ void load_file(const char * filename) {
         exit(errno);        
     }
 
-    unsigned int exit_code = load_data(file_input);
+    int exit_code = load_data(file_input);
 
     fclose(file_input);
 
     if (exit_code) {
+        print_log(LOG_ERROR, "Ошибка при разборе файла '%s'\n", filename);
+        
+        switch (exit_code) {
+            case 1:
+                print_log(LOG_ERROR, "Неожиданный конец файла или повреждение данных\n");
+                break;
+            case 2:
+                print_log(LOG_ERROR, "Обнаружено некорректное значение байта\n");
+                break;
+            case 3:
+                print_log(LOG_ERROR, "Попытка записи за пределы доступной памяти\n");
+                break;
+            default:
+                print_log(LOG_ERROR, "Неизвестная ошибка (код %d)\n", exit_code);
+                break;
+        }
+
         exit(exit_code);
+
     }
+
+    print_log(LOG_INFO, "Файл успешно загружен в память\n");
 }
 
 int set_log_level(int level) {
@@ -191,7 +257,7 @@ int set_log_level(int level) {
 }
 
 void print_log(int level, const char* format, ...) {
-    if (level > (int)current_log_level) {
+    if (level < LOG_OFF || level > LOG_DEBUG || level > (int)current_log_level || current_log_level == LOG_OFF) {
         return;
     }
 
