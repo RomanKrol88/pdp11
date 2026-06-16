@@ -1,9 +1,10 @@
 #folders
 
-manuals/*
-reference_emulator_pdp11/*
-test/*
-.vscode/*
+build/
+manuals/
+reference_emulator_pdp11/
+test/
+.vscode/
 
 #files
 
