@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <errno.h>
 
-static Byte mem[MEMSIZE];          //память (ОЗУ)
-//static Word reg[8];                //дополнительная память (регистры)
+static Byte mem[MEMSIZE];          //оперативная память
 
 static int load_data(FILE * file);      //функция читает данные из файла и записывает в память (возвращает код ошибки или 0, если прочитано без ошибок)
 
