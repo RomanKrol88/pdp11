@@ -1,5 +1,7 @@
+#include "config.h"
 #include "memory.h"
 #include "logger.h"
+#include "cpu.h"
 #include <stdio.h>
 #include <assert.h>
 #include <stdlib.h>
@@ -18,7 +20,12 @@ Byte b_read (Address adr) {
     return mem[adr];
 }
 
-void w_write (Address adr, Word val) {
+void w_write (Address adr, Word val, int space) {
+    if (space == REGSPACE) {                        //проерка адресного пространства (куда писать значение)
+        w_reg_write(adr, val); 
+        return;
+    }
+
     assert((adr & 1) == 0);                         //проверка, что адрес слова четный
     assert(adr < MEMSIZE - 1);                      //проверка, что адрес не выходит за границы памяти
 
@@ -131,7 +138,7 @@ void test_mem(void) {
     print_log(LOG_INFO, "Пишем и читаем слово\n");
     a = 2;        // другой адрес
     w = 0x3456;
-    w_write(a, w);
+    w_write(a, w, MEMSPACE);
     wres = w_read(a);
     //тут полезно написать отладочную печать a, w, wres
     print_log(LOG_TRACE, "a = %06o w = %04x wres = %04x\n", a, w, wres);
@@ -166,7 +173,7 @@ void test_mem(void) {
     print_log(LOG_INFO, "Пишем слово, читаем побайтово\n");
     a = 6;
     w = 0xCDE1;
-    w_write(a, w);
+    w_write(a, w, MEMSPACE);
     b0 = b_read(a);     // должен быть младший байт: 0xE1
     b1 = b_read(a + 1); // должен быть старший байт: 0xCD
     print_log(LOG_TRACE, "a = %06o w = %04x b1 = %02hhx b0 = %02hhx\n", a, w, b1, b0);
@@ -188,7 +195,7 @@ void test_mem(void) {
     print_log(LOG_INFO, "Пишем отрицательное слово, читаем побайтово\n");
     a = 10;
     signed_w = -3678;    //0xF1A2
-    w_write(a, (Word)signed_w);
+    w_write(a, (Word)signed_w, MEMSPACE);
     signed_b0 = (signed char)b_read(a);       //должен быть младший байт: 0xA2 (-94)
     signed_b1 = (signed char)b_read(a + 1);   //должен быт старший байт: 0xF1 (-15)
     print_log(LOG_TRACE, "a = %06o signed_w = %04x signed_b1 = %d, signed_b0 = %d\n", a, (Word)signed_w, signed_b1, signed_b0);

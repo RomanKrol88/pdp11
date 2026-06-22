@@ -16,7 +16,15 @@ int main (int argc, char * argv[])  {
     //mem_dump(0x40, 20);
     //mem_dump(0x200, 0x26);
 
-    run();
+    test_parse_mov();
+    test_mode0();
+    test_mov();
+    test_mode1_toreg();
+    test_mode1_fromreg();
+    test_mode2_reg();
+    test_mode2_pc();
 
+    run();
+    
     return 0;
 }
