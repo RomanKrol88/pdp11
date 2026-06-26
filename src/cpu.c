@@ -7,21 +7,20 @@
 #include <assert.h>
 #include <string.h>
 
-static Word reg[REGSIZE];           //регистры процессора (дополнительная память)
-#define SP reg[6]                   //Stack Pointer (отдельно выделенный регистр R6)
-#define PC reg[7]                   //Program Counter (отдельно выделенный регистр R7)
+Word reg[REGSIZE];      //регистры процессора (дополнительная память)
 
-Command command[] = {                       //таблица команд
-    {0170000, 0060000, "add", do_add},
-    {0170000, 0010000, "mov", do_mov},
-    {0170000, 0000000, "halt", do_halt},
+Command command[] = {   //таблица команд
+    {0170000, 0060000, "add", do_add, HAS_SS | HAS_DD},
+    {0170000, 0010000, "mov", do_mov, HAS_SS | HAS_DD},
+    {0170000, 0000000, "halt", do_halt, NO_PARAMS},
 };
 
 #define COMMAND_COUNT (sizeof(command) / sizeof(command[0]))
 
-static Arg ss, dd;  //переменные аргументов (ss - откуда, dd - куда)
+Arg ss, dd;                 //переменные аргументов (ss - откуда, dd - куда)
+static int r, n, nn, xx;    //переменные (r - номер регистра, n - константа 3 бита, nn  - константа 6 бит, xx - смещение со знаком)
 
-static const Command unknown_command = {0, 0, "unknown", do_nothing}; //если функция не определена
+static const Command unknown_command = {0, 0, "unknown", do_nothing, NO_PARAMS}; //если функция не определена
 
 void format_arg(Arg arg, Word bits, char *out_str) {
     int m = (bits >> 3) & 7;
@@ -34,6 +33,25 @@ void format_arg(Arg arg, Word bits, char *out_str) {
             if (r == 7) sprintf(out_str, "#%o", arg.val);
             else sprintf(out_str, "(R%d)+", r);
             break;
+        case 3: 
+            if (r == 7) sprintf(out_str, "@#%o", arg.adr);
+            else sprintf(out_str, "@(R%d)+", r);
+            break;
+        case 4: 
+            sprintf(out_str, "-(R%d)", r); 
+            break;
+        case 5: 
+            sprintf(out_str, "@-(R%d)", r); 
+            break;
+        case 6:
+            Word x = arg.adr - reg[r];
+            if (r == 7) sprintf(out_str, "%o", arg.adr);
+            else sprintf(out_str, "%o(R%d)", x, r);
+            break;
+        case 7:
+            if (r == 7) sprintf(out_str, "@#%o", arg.adr);
+            else sprintf(out_str, "@#%o", arg.adr);
+            break;
         default: sprintf(out_str, "?"); break;
     }
 }
@@ -45,10 +63,34 @@ void reg_dump() {
 Command parse_cmd(Word w) {
     //поиск в таблице команд
     for (size_t i = 0; i < COMMAND_COUNT; i++) {
-        if ((w & command[i].mask) == command[i].opcode) {
-            ss = get_mr(w >> 6);
-            dd = get_mr(w);
-            return command[i]; 
+        if ((w & command[i].mask) == command[i].opcode) {   
+            //проверка флага SS
+            if (command[i].params & HAS_SS) {
+                ss = get_mr(w >> 6);
+            }
+            //проверка флага DD
+            if (command[i].params & HAS_DD) {
+                dd = get_mr(w);
+            }
+            //проверка флага R
+            if (command[i].params & HAS_R) {
+                r = (w >> 6) & 7;
+            }
+            //проверка флага N
+            if (command[i].params & HAS_N) {
+                n = w & 7;
+            }
+            //проверка флага NN
+            if (command[i].params & HAS_NN) {
+                nn = w & 077;
+            }
+            //проверка флага XX
+            if (command[i].params & HAS_XX) {
+                char offset = (char)(w & 0xFF);
+                xx = (int)offset;
+            }
+
+            return command[i];
         }
     }
     
@@ -98,37 +140,84 @@ void run(void) {
 
 Arg get_mr(Word w) {
     Arg res;
+    Address pointer_adr;    //указатель на адрес
+    Word x;                 //смещение (для моды 6 и 7)
     int m = (w >> 3) & 7;   //номер моды
     int r = w & 7;          //номер регистра
 
     switch (m) {
         //мода 0, R1
         case 0:
-            res.adr = r;                //адрес - номер регистра
-            res.val = reg[r];           //значение - число в регистре
-            res.space = REGSPACE;       //записываем в регистр
+            res.adr = r;                                //адрес - номер регистра
+            res.val = reg[r];                           //значение - число в регистре
+            res.space = REGSPACE;                       //записываем в регистр
             break;
 
         //мода 1, (R1)
         case 1:
-            res.adr = reg[r];           //в регистре адрес
-            res.val = w_read(res.adr);  //по адресу - значение
-            res.space = MEMSPACE;       //записываем в память
+            res.adr = reg[r];                           //в регистре адрес
+            res.val = w_read(res.adr);                  //по адресу - значение
+            res.space = MEMSPACE;                       //записываем в память
             break;
 
         //мода 2, (R1)+ или #3
         case 2:
-            res.adr = reg[r];           //в регистре адрес
-            res.val = w_read(res.adr);  //по адресу - значение
-            res.space = MEMSPACE;       //записываем в память
-            reg[r] += 2;                //TODO: +1
+            res.adr = reg[r];                           //в регистре адрес
+            res.val = w_read(res.adr);                  //по адресу - значение
+            res.space = MEMSPACE;                       //записываем в память
+            reg[r] += 2;                                //TODO: +1
             break;
 
-        //мы еще не дописали другие моды
+        //мода 3, @(R1)+ или @#100
+        case 3:
+            Address point_adr = reg[r];                 //в регистре адрес
+            res.adr = w_read(point_adr);                //по адресу - целевой адрес
+            reg[r] += 2;                                //автоинкремент регистра (всегда +2)
+            res.val = w_read(res.adr);                  //по целевому адресу - значение
+            res.space = MEMSPACE;                       //записываем в память
+            break;
+
+        //мода 4, -(R1)
+        case 4:
+            reg[r] -= 2;                                //автодекремент регистра (всегда -2)
+            res.adr = reg[r];                           //в регистре новый адрес
+            res.val = w_read(res.adr);                  //по адресу значение
+            res.space = MEMSPACE;                       //записываем в память
+            break;
+
+        //мода 5, @-(R1)
+        case 5:
+            reg[r] -= 2;                                //автодекремент регистра (всегда -2)
+            pointer_adr = reg[r];               //в регистре адрес
+            res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
+            res.val = w_read(res.adr);                  //по целевому адресу - значение
+            res.space = MEMSPACE;                       //записываем в память
+            break;
+
+        // мода 6, X(R1) или X(PC)
+        case 6:
+            x = w_read(PC); 
+            PC += 2;
+            res.adr = (Address)(reg[r] + (short)x);     //адрес указателя со смещением
+            res.val = w_read(res.adr);                  //по адресу - значение
+            res.space = MEMSPACE;                       //записываем в память
+            break;
+
+        // мода 7, @X(R1) или @X(PC)
+        case 7:
+            x = w_read(PC); 
+            PC += 2;
+            pointer_adr = (Address)(reg[r] + (short)x); //адрес указателя со смещением
+            res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
+            res.val = w_read(res.adr);                  //по целевому адресу - значение
+            res.space = MEMSPACE;                       //записываем в память
+            break;
+
         default:
             print_log(LOG_ERROR, "Mode %d not implemented yet!\n", m);
             exit(1);
         }
+
     return res;
 }
 
@@ -153,156 +242,4 @@ void do_add(void) {
 
 void do_nothing(void) {
     printf("unknown\n");
-}
-
-//тесты:
-//тест, что мы правильно определяем команды MOV, ADD, HALT
-void test_parse_mov(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
-    Command cmd = parse_cmd(0010604);
-    assert(strcmp(cmd.name, "mov") == 0);
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
-}
-//тест, что мы разобрали правильно аргументы SS и DD в MOV R5, R3
-void test_mode0(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
-    reg[3] = 12;    // dd
-    reg[5] = 34;    // ss
-    parse_cmd(0010503);
-    assert(ss.val == 34);
-    assert(ss.adr == 5);
-    assert(dd.val == 12);
-    assert(dd.adr == 3);
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
-}
-//тест, что MOV и мода 0 работают верно в mov R5, R3
- void test_mov(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
-    reg[3] = 12;    // dd
-    reg[5] = 34;    // ss
-    Command cmd = parse_cmd(0010503);
-    cmd.do_command();
-    assert(reg[3] == 34);
-    assert(reg[5] == 34);
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
-}
-
-// тест на чтение, что мы разобрали правильно аргументы SS и DD в MOV (R5), R3
-void test_mode1_toreg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
-    // setup
-    reg[3] = 12;    // dd
-    reg[5] = 0200;  // ss
-    w_write(0200, 34, MEMSPACE);
-
-    Command cmd = parse_cmd(0011503);
-
-    assert(ss.val == 34);
-    assert(ss.adr == 0200);
-    assert(dd.val == 12);
-    assert(dd.adr == 3);
-
-    cmd.do_command();
-
-    assert(reg[3] == 34);
-    //проверяем, что значение регистра не изменилось
-    assert(reg[5] == 0200);
-
-    //clean
-    reg[3] = 0;
-    reg[5] = 0;
-    w_write(0200, 0, MEMSPACE);
-
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
-}
-
-//тест на запись из регистра в память MOV R3, (R5)
-void test_mode1_fromreg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
-    //setup
-    reg[3] = 75;    //dd
-    reg[5] = 0400;  //ss
-    w_write(0400, 0, MEMSPACE);
-
-    Command cmd = parse_cmd(0010315);
-
-    assert(ss.val == 75);
-    assert(ss.adr == 3);
-    assert(ss.space == REGSPACE);
-
-    assert(dd.adr == 0400);
-    assert(dd.space == MEMSPACE);
-
-    cmd.do_command();
-
-    //проверяем, что в ОЗУ по адресу 400 появилось число 75
-    assert(w_read(0400) == 75);
-    assert(reg[3] == 75);   //регистр не должен поменяться
-
-    //clean
-    reg[3] = 0;
-    reg[5] = 0;
-    w_write(0400, 0, MEMSPACE);
-
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
-}
-
-//тест на автоинкремент регистра MOV (R5)+, R3
-void test_mode2_reg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
-
-    //setup
-    reg[3] = 0;     //dd
-    reg[5] = 0200;  //ss
-    w_write(0200, 55, MEMSPACE);
-
-    Command cmd = parse_cmd(0012503);
-
-    assert(ss.val == 55);
-    assert(ss.adr == 0200);
-    assert(ss.space == MEMSPACE);
-
-    assert(dd.val == 0);
-    assert(dd.adr == 3);
-    assert(dd.space == REGSPACE);
-
-    cmd.do_command();
-
-    assert(reg[3] == 55);
-    assert(reg[5] == 0202); //значение в регистре R5 должно увеличиться на 2
-
-    //clean
-    reg[3] = 0;
-    reg[5] = 0;
-    w_write(000200, 0, MEMSPACE);
-
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
-}
-
-//тест на автоинкремент регистра R7 MOV #77, R3
-void test_mode2_pc(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
-
-    //setup
-    reg[3] = 0;     //dd
-    PC = 02000;    //ss
-    w_write(002000, 77, MEMSPACE);
-
-    Command cmd = parse_cmd(0012703);
-
-    assert(ss.val == 77);
-    assert(ss.adr == 02000);
-    assert(ss.space == MEMSPACE);
-
-    cmd.do_command();
-
-    assert(reg[3] == 77);
-    assert(PC == 02002); //PC должен увеличиться на 2
-
-    //clean
-    reg[3] = 0;
-    PC = 0;
-    w_write(02000, 0, MEMSPACE);
-
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
 }

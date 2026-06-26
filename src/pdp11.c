@@ -1,28 +1,51 @@
 #include "memory.h"
 #include "logger.h"
 #include "cpu.h"
+#include "tests.h"
+#include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 
 int main (int argc, char * argv[])  {
-    const char * filename = (argc > 1) ? argv[1] : "test/data.txt";      //по-умолчанию используем файл data.txt
-    
+  
     set_log_level(LOG_DEBUG);
 
-    //test_mem();
+    int testing_mode = 0;   //если тест выполнен - 1
+
+    //запуск программы в режиме тестирования
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--testall") == 0) {
+            run_all_tests(); //запуск всех тестов
+            testing_mode = 1;
+            break;
+        }
+        if (strcmp(argv[i], "--test") == 0) {
+            if (i + 1 < argc) {
+                const char *arg = argv[i + 1];
+                
+                if (isdigit((unsigned char)arg[0])) { 
+                    int id = atoi(arg); //перевод строки в ID
+                    run_test_by_id(id); //запуск теста по ID
+                } else {
+                    run_test_by_name(arg); //если ID не распознан, запускаем по имени
+                }
+                return 0; 
+            } else {
+                print_log(LOG_ERROR, "Error: The --test option requires a test name or ID argument!\n");
+                return 1;
+            }
+        }
+    }
+    //выполняем тест и выходим из режима тестирования
+    if (testing_mode) {
+        return 0;
+    }
+
+    const char * filename = (argc > 1) ? argv[1] : "test/data.txt";      //по-умолчанию используем файл data.txt
 
     //load_data(stdin);
 
     load_file(filename);
-
-    //mem_dump(0x40, 20);
-    //mem_dump(0x200, 0x26);
-
-    test_parse_mov();
-    test_mode0();
-    test_mov();
-    test_mode1_toreg();
-    test_mode1_fromreg();
-    test_mode2_reg();
-    test_mode2_pc();
 
     run();
     
