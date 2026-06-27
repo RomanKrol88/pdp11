@@ -10,7 +10,7 @@ int main (int argc, char * argv[])  {
   
     set_log_level(LOG_DEBUG);
 
-    int testing_mode = 0;   //если тест выполнен - 1
+    int testing_mode = 0;
 
     //запуск программы в режиме тестирования
     for (int i = 1; i < argc; i++) {
@@ -40,6 +40,10 @@ int main (int argc, char * argv[])  {
     if (testing_mode) {
         return 0;
     }
+
+    print_log(LOG_INFO, "==================================================\n");
+    print_log(LOG_INFO, "         PDP-11 EMULATOR v1.0 BY ROMAN KROL       \n");
+    print_log(LOG_INFO, "==================================================\n");
 
     const char * filename = (argc > 1) ? argv[1] : "test/data.txt";      //по-умолчанию используем файл data.txt
 

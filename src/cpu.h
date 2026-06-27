@@ -44,6 +44,8 @@ void w_reg_write(int r, Word val);                      //функция зап�
 void do_halt(void);                                     //функция остановки HALT (opcode = 000000)
 void do_add(void);                                      //..........НАПИСАТЬ ОПИСАНИЕ КОМАНД..........
 void do_mov(void);
+void do_sob(void);
+void do_clr(void);
 void do_nothing(void);
 
 #endif

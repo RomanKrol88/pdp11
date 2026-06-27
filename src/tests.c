@@ -11,24 +11,27 @@
 extern Byte mem[MEMSIZE];
 extern Word reg[REGSIZE];
 extern Arg ss, dd;
+extern int r, n, nn, xx;
 
 typedef enum {
     TEST_MEM            =  1,
     TEST_PARSE_MOV      =  2,
     TEST_MOV            =  3,
-    TEST_MODE0          =  4,
-    TEST_MODE1_TOREG    =  5,
-    TEST_MODE1_FROMREG  =  6,
-    TEST_MODE2_REG      =  7,
-    TEST_MODE2_PC       =  8,
-    TEST_MODE3_REG      =  9,
-    TEST_MODE3_PC       = 10,
-    TEST_MODE4          = 11,
-    TEST_MODE5          = 12,
-    TEST_MODE6_REG      = 13,
-    TEST_MODE6_PC       = 14,
-    TEST_MODE7_REG      = 15,
-    TEST_MODE7_PC       = 16
+    TEST_SOB            =  4,
+    TEST_CLR            =  5,
+    TEST_MODE0          =  6,
+    TEST_MODE1_TOREG    =  7,
+    TEST_MODE1_FROMREG  =  8,
+    TEST_MODE2_REG      =  9,
+    TEST_MODE2_PC       = 10,
+    TEST_MODE3_REG      = 11,
+    TEST_MODE3_PC       = 12,
+    TEST_MODE4          = 13,
+    TEST_MODE5          = 14,
+    TEST_MODE6_REG      = 15,
+    TEST_MODE6_PC       = 16,
+    TEST_MODE7_REG      = 17,
+    TEST_MODE7_PC       = 18
 } TestID;
 
 typedef struct {
@@ -38,22 +41,24 @@ typedef struct {
 } TestCase;
 
 static const TestCase test_table[] = {
-    {TEST_MEM,            "test_mem",               test_mem},
-    {TEST_PARSE_MOV,      "test_parse_mov",         test_parse_mov},
-    {TEST_MOV,            "test_mov",               test_mov},
-    {TEST_MODE0,          "test_mode0",             test_mode0},
-    {TEST_MODE1_TOREG,    "test_mode1_toreg",       test_mode1_toreg},
-    {TEST_MODE1_FROMREG,  "test_mode1_fromreg",     test_mode1_fromreg},
-    {TEST_MODE2_REG,      "test_mode2_reg",         test_mode2_reg},
-    {TEST_MODE2_PC,       "test_mode2_pc",          test_mode2_pc},
-    {TEST_MODE3_REG,      "test_mode3_reg",         test_mode3_reg},
-    {TEST_MODE3_PC,       "test_mode3_pc",          test_mode3_pc},
-    {TEST_MODE4,          "test_mode4",             test_mode4},
-    {TEST_MODE5,          "test_mode5",             test_mode5},
-    {TEST_MODE6_REG,      "test_mode6_reg",         test_mode6_reg},
-    {TEST_MODE6_PC,       "test_mode6_pc",          test_mode6_pc},
-    {TEST_MODE7_REG,      "test_mode7_reg",         test_mode7_reg},
-    {TEST_MODE7_PC,       "test_mode7_pc",          test_mode7_pc}
+    {TEST_MEM,              "test_mem",                 test_mem},
+    {TEST_PARSE_MOV,        "test_parse_mov",           test_parse_mov},
+    {TEST_MOV,              "test_mov",                 test_mov},
+    {TEST_SOB,              "test_sob",                 test_sob},
+    {TEST_CLR,              "test_clr",                 test_clr},
+    {TEST_MODE0,            "test_mode0",               test_mode0},
+    {TEST_MODE1_TOREG,      "test_mode1_toreg",         test_mode1_toreg},
+    {TEST_MODE1_FROMREG,    "test_mode1_fromreg",       test_mode1_fromreg},
+    {TEST_MODE2_REG,        "test_mode2_reg",           test_mode2_reg},
+    {TEST_MODE2_PC,         "test_mode2_pc",            test_mode2_pc},
+    {TEST_MODE3_REG,        "test_mode3_reg",           test_mode3_reg},
+    {TEST_MODE3_PC,         "test_mode3_pc",            test_mode3_pc},
+    {TEST_MODE4,            "test_mode4",               test_mode4},
+    {TEST_MODE5,            "test_mode5",               test_mode5},
+    {TEST_MODE6_REG,        "test_mode6_reg",           test_mode6_reg},
+    {TEST_MODE6_PC,         "test_mode6_pc",            test_mode6_pc},
+    {TEST_MODE7_REG,        "test_mode7_reg",           test_mode7_reg},
+    {TEST_MODE7_PC,         "test_mode7_pc",            test_mode7_pc},
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -80,22 +85,24 @@ void run_test_by_id(int id) {
     print_log(LOG_INFO, "=== STARTING SINGLE TEST ID: [%d] NAME: <%s> ===\n", id, test_table[id - 1].name);
 
     switch ((TestID)id) {
-        case TEST_MEM:            test_mem();               break;
-        case TEST_PARSE_MOV:      test_parse_mov();         break;
-        case TEST_MOV:            test_mov();               break;
-        case TEST_MODE0:          test_mode0();             break;
-        case TEST_MODE1_TOREG:    test_mode1_toreg();       break;
-        case TEST_MODE1_FROMREG:  test_mode1_fromreg();     break;
-        case TEST_MODE2_REG:      test_mode2_reg();         break;
-        case TEST_MODE2_PC:       test_mode2_pc();          break;
-        case TEST_MODE3_REG:      test_mode3_reg();         break;
-        case TEST_MODE3_PC:       test_mode3_pc();          break;
-        case TEST_MODE4:          test_mode4();             break;
-        case TEST_MODE5:          test_mode5();             break;
-        case TEST_MODE6_REG:      test_mode6_reg();         break;
-        case TEST_MODE6_PC:       test_mode6_pc();          break;
-        case TEST_MODE7_REG:      test_mode7_reg();         break;
-        case TEST_MODE7_PC:       test_mode7_pc();          break;
+        case TEST_MEM:              test_mem();               break;
+        case TEST_PARSE_MOV:        test_parse_mov();         break;
+        case TEST_MOV:              test_mov();               break;
+        case TEST_SOB:              test_sob();               break;
+        case TEST_CLR:              test_clr();             break;
+        case TEST_MODE0:            test_mode0();             break;
+        case TEST_MODE1_TOREG:      test_mode1_toreg();       break;
+        case TEST_MODE1_FROMREG:    test_mode1_fromreg();     break;
+        case TEST_MODE2_REG:        test_mode2_reg();         break;
+        case TEST_MODE2_PC:         test_mode2_pc();          break;
+        case TEST_MODE3_REG:        test_mode3_reg();         break;
+        case TEST_MODE3_PC:         test_mode3_pc();          break;
+        case TEST_MODE4:            test_mode4();             break;
+        case TEST_MODE5:            test_mode5();             break;
+        case TEST_MODE6_REG:        test_mode6_reg();         break;
+        case TEST_MODE6_PC:         test_mode6_pc();          break;
+        case TEST_MODE7_REG:        test_mode7_reg();         break;
+        case TEST_MODE7_PC:         test_mode7_pc();          break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===\n", test_table[id - 1].name);
@@ -215,7 +222,7 @@ void test_mem(void) {
 
 //3. Юнит-тесты для проверки работы с командами процессора:
 
-//тест, что мы правильно определяем команды MOV, ADD, HALT
+//тест на распознавание команды MOV, ADD, HALT
 void test_parse_mov(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
     Command cmd = parse_cmd(0010604);
@@ -223,7 +230,7 @@ void test_parse_mov(void) {
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
 }
 
-//тест, что MOV и мода 0 работают верно в mov R5, R3
+//тест на выполнение MOV по моде 0 в команде MOV R5, R3
  void test_mov(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
     reg[3] = 12;    // dd
@@ -232,6 +239,56 @@ void test_parse_mov(void) {
     cmd.do_command();
     assert(reg[3] == 34);
     assert(reg[5] == 34);
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на выполнение SOB в команде SOB R1, LOOP
+void test_sob(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+
+    //setup 1
+    reg[1] = 5;       //счетчик цикла
+    PC = 001020;      //SOB по адресу 1016, текущий PC = 1020
+
+    Command cmd = parse_cmd(0077103);
+
+    assert(r == 1);
+    assert(nn == 3);
+
+    cmd.do_command();
+
+    assert(reg[1] == 4);
+    assert(PC == 001012); 
+
+    //setup 2
+    reg[1] = 1;       //последняя итерация цикла
+    PC = 001020;
+
+    cmd.do_command();
+
+    assert(reg[1] == 0);
+    assert(PC == 001020);
+
+    //clean
+    reg[1] = 0; PC = 0;
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на выполнение CLR в команде CLR R4
+void test_clr(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+
+    //setup
+    reg[4] = 1234;
+
+    Command cmd = parse_cmd(0005004);
+
+    cmd.do_command();
+
+    assert(reg[4] == 0);
+
+    //clean еще раз=)
+    reg[4] = 0;
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
 }
 
