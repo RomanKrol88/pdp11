@@ -57,6 +57,7 @@ static int load_data(FILE * file) {
     int n;
     
     while (fscanf(file, "%x %x", &block_adr, &n) == 2) {    //сперва читаем адрес блока и количество записываемых байт
+        print_log(LOG_TRACE, "Loading block: address 0x%X (octal 0%o), size %d bytes\n", block_adr, block_adr, n);
         for (int i = 0; i < n; i++) {
             unsigned int byte_value;
 

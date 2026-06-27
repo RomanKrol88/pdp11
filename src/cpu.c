@@ -10,17 +10,30 @@
 Word reg[REGSIZE];      //регистры процессора (дополнительная память)
 
 Command command[] = {   //таблица команд
-    {0170000, 0060000, "add", do_add, HAS_SS | HAS_DD},
-    {0170000, 0010000, "mov", do_mov, HAS_SS | HAS_DD},
-    {0177000, 0077000, "sob", do_sob, HAS_R | HAS_NN},
-    {0177700, 0005000, "clr",  do_clr,  HAS_DD},
-    {0177777, 0000000, "halt", do_halt, NO_PARAMS},
+    {0170000, 0060000,  "add",   do_add,    HAS_SS | HAS_DD},
+    {0170000, 0010000,  "mov",   do_mov,    HAS_SS | HAS_DD},
+    {0170000, 0110000,  "movb",  do_mov,    HAS_SS | HAS_DD},
+    {0177000, 0077000,  "sob",   do_sob,    HAS_R | HAS_NN},
+    {0177700, 0005000,  "clr",   do_clr,    HAS_DD},
+    {0177400, 0000400,  "br",    do_br,     HAS_XX},          
+    {0177400, 0100000,  "bpl",   do_bpl,    HAS_XX}, 
+    {0177400, 0001000,  "bne",   do_bne,    HAS_XX}, 
+    {0177400, 0001400,  "beq",   do_beq,    HAS_XX},
+    {0177777, 0000000,  "halt",  do_halt,   NO_PARAMS},
 };
 
 #define COMMAND_COUNT (sizeof(command) / sizeof(command[0]))
 
 Arg ss, dd;                 //переменные аргументов (ss - откуда, dd - куда)
 int r, n, nn, xx;           //переменные (r - номер регистра, n - константа 3 бита, nn  - константа 6 бит, xx - смещение со знаком)
+
+//флаги условий регистра состояния PSW
+int flag_N = 0;             //Negative (результат отрицательный)
+int flag_Z = 0;             //Zero     (результат равен нулю)
+int flag_V = 0;             //oVerflow (Знаковое переполнение)
+int flag_C = 0;             //Carry    (перенос из старшего разряда)
+
+int byte_cmd = 0;           //1 — команда BYTE, 0 — команда WORD (15-й бит)
 
 static const Command unknown_command = {0, 0, "unknown", do_nothing, NO_PARAMS}; //если функция не определена
 
@@ -63,6 +76,9 @@ void reg_dump() {
 }
 
 Command parse_cmd(Word w) {
+
+    byte_cmd = (w >> 15) & 1;
+
     //поиск в таблице команд
     for (size_t i = 0; i < COMMAND_COUNT; i++) {
         if ((w & command[i].mask) == command[i].opcode) {   
@@ -164,16 +180,28 @@ Arg get_mr(Word w) {
         //мода 1, (R1)
         case 1:
             res.adr = reg[r];                           //в регистре адрес
-            res.val = w_read(res.adr);                  //по адресу - значение
+            if (byte_cmd) {
+                res.val = (signed char)b_read(res.adr); //по адресу байта - значение
+            } else {
+                res.val = w_read(res.adr);              //по адресу Word - значение
+            }                                       
             res.space = MEMSPACE;                       //записываем в память
             break;
 
         //мода 2, (R1)+ или #3
         case 2:
             res.adr = reg[r];                           //в регистре адрес
-            res.val = w_read(res.adr);                  //по адресу - значение
+            if (byte_cmd) {
+                res.val = (signed char)b_read(res.adr); //по адресу байта - значение
+            } else {
+                res.val = w_read(res.adr);              //по адресу Word - значение
+            }
             res.space = MEMSPACE;                       //записываем в память
-            reg[r] += 2;                                //TODO: +1
+            if (byte_cmd && r < 6) {
+                reg[r] += 1;                            //байтовый инкремент в регистрах R0-R5
+            } else {
+                reg[r] += 2;                            //инкремент для PC и SP только команды Word
+            }  
             break;
 
         //мода 3, @(R1)+ или @#100
@@ -187,16 +215,24 @@ Arg get_mr(Word w) {
 
         //мода 4, -(R1)
         case 4:
-            reg[r] -= 2;                                //автодекремент регистра (всегда -2)
+            if (byte_cmd && r < 6) {
+                reg[r] -= 1;                            //байтовый автодекремент в регистрах R0-R5
+            } else {
+                reg[r] -= 2;                            //автодекремент для PC и SP только команды Word
+            }
             res.adr = reg[r];                           //в регистре новый адрес
-            res.val = w_read(res.adr);                  //по адресу значение
+            if (byte_cmd) {
+                res.val = (signed char)b_read(res.adr); //по адресу байта - значение
+            } else {
+                res.val = w_read(res.adr);              //по адресу Word - значение
+            }
             res.space = MEMSPACE;                       //записываем в память
             break;
 
         //мода 5, @-(R1)
         case 5:
             reg[r] -= 2;                                //автодекремент регистра (всегда -2)
-            pointer_adr = reg[r];               //в регистре адрес
+            pointer_adr = reg[r];                       //в регистре адрес
             res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
             res.val = w_read(res.adr);                  //по целевому адресу - значение
             res.space = MEMSPACE;                       //записываем в память
@@ -233,6 +269,32 @@ void w_reg_write(int r, Word val) {
     reg[r] = val;
 }
 
+void set_flags_mov(Word val) {
+    if (byte_cmd) {
+        Byte res_byte = (Byte)val;
+        flag_Z = (res_byte == 0) ? 1 : 0;
+        flag_N = (res_byte >> 7) & 1; //7-й бит байта — знаковый
+    } else {
+        Word res_word = val & 0177777;
+        flag_Z = (res_word == 0) ? 1 : 0;
+        flag_N = (res_word >> 15) & 1; //15-й бит слова — знаковый
+    }
+
+    flag_V = 0; //флаг V всегда 0
+}
+
+// Функция вычисления флагов C и V для команды сложения ADD
+void set_flags_add(Word src, Word dst, unsigned int res) {
+    Word s = src & 0177777;
+    Word d = dst & 0177777;
+    Word r = (Word)(res & 0177777);
+    
+    flag_C = (res >> 16) & 1; 
+    flag_V = (((s >> 15) == (d >> 15)) && ((s >> 15) != (r >> 15))) ? 1 : 0;
+    //флаги C и V не меняются
+}
+
+
 void do_halt(void) {
     print_log(LOG_INFO, "==================================================\n");
     print_log(LOG_INFO, "               PROCESSOR HALTED                   \n");
@@ -247,10 +309,22 @@ void do_halt(void) {
 }
 
 void do_mov(void) {
-    w_write(dd.adr, ss.val, dd.space);      //значение аргумента SS пишем по адресу аргумента DD
+    if (byte_cmd) {
+        b_write(dd.adr, (Byte)ss.val);      //значение байтового аргумента SS пишем по адресу аргумента DD
+    } else {
+        w_write(dd.adr, ss.val, dd.space);  //значение Word аргумента SS пишем по адресу аргумента DD
+    }
+    set_flags_mov(ss.val);                  //выставляем флаги условий PSW
 }
+
 void do_add(void) {
-    w_write(dd.adr, ss.val + dd.val, dd.space);     //сумму значений аргументов SS и DD пишем по адресу аргумента DD
+    unsigned int res32 = (unsigned int)ss.val + (unsigned int)dd.val;   //сумма SS и DD
+    
+    Word final_res = (Word)(res32 & 0177777);
+    w_write(dd.adr, final_res, dd.space);
+    
+    set_flags_mov(final_res);
+    set_flags_add(ss.val, dd.val, res32);
 }
 
 void do_sob(void) {
@@ -263,6 +337,28 @@ void do_sob(void) {
 
 void do_clr(void) {
     w_write(dd.adr, 0, dd.space);   //обнуляем регистр
+}
+
+void do_br(void) {
+    PC = PC + xx * 2;
+}
+
+void do_bpl(void) {
+    if (flag_N == 0) {
+        do_br();
+    }
+}
+
+void do_bne(void) {
+    if (flag_Z == 0) {
+        do_br();
+    }
+}
+
+void do_beq(void) {
+    if (flag_Z == 1) {
+        do_br();
+    }
 }
 
 void do_nothing(void) {

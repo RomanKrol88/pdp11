@@ -19,6 +19,15 @@
 #define HAS_NN    (1 << 4)  //16 (010000) - NN (6 бит)
 #define HAS_XX    (1 << 5)  //32 (100000) - XX (8 бит)
 
+//флаги условий регистра состояния PSW
+extern int flag_N;  //Negative (результат отрицательный)
+extern int flag_Z;  //Zero     (результат равен нулю)
+extern int flag_V;  //oVerflow (Знаковое переполнение)
+extern int flag_C;  //Carry    (перенос из старшего разряда
+
+extern int byte_cmd;
+extern int xx;
+
 typedef struct {
     Word val;       //значение
     Address adr;    //адрес
@@ -33,12 +42,14 @@ typedef struct {
     char params;
 } Command;
 
-void format_arg(Arg arg, Word bits, char *out_str);     //функция вывода на печать лога
-void reg_dump(void);                                    //функция дампа регистров
-void run(void);                                         //функция распознавания и запуска программ
-Arg get_mr(Word w);                                     //функция разбора агрумента на моду и регистр
-Command parse_cmd(Word w);                              //декодер команд процессора
-void w_reg_write(int r, Word val);                      //функция записи слова в регистр
+void format_arg(Arg arg, Word bits, char *out_str);             //функция вывода на печать лога
+void reg_dump(void);                                            //функция дампа регистров
+void run(void);                                                 //функция распознавания и запуска программ
+Arg get_mr(Word w);                                             //функция разбора агрумента на моду и регистр
+Command parse_cmd(Word w);                                      //декодер команд процессора
+void w_reg_write(int r, Word val);                              //функция записи слова в регистр
+void set_flags_mov(Word val);                                   //функция установки флагов для команд MOV, MOVB, CLR
+void set_flags_add(Word src, Word dst, unsigned int res32);     //функция установки флагов для команды ADD
 
 //команды процессора:
 void do_halt(void);                                     //функция остановки HALT (opcode = 000000)
@@ -46,6 +57,10 @@ void do_add(void);                                      //..........НАПИСА
 void do_mov(void);
 void do_sob(void);
 void do_clr(void);
+void do_br(void);
+void do_bpl(void);
+void do_bne(void);
+void do_beq(void);
 void do_nothing(void);
 
 #endif

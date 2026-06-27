@@ -31,7 +31,17 @@ typedef enum {
     TEST_MODE6_REG      = 15,
     TEST_MODE6_PC       = 16,
     TEST_MODE7_REG      = 17,
-    TEST_MODE7_PC       = 18
+    TEST_MODE7_PC       = 18,
+    TEST_FLAGS_MOV_Z    = 19, 
+    TEST_FLAGS_MOV_N    = 20,
+    TEST_FLAGS_ADD_C    = 21,
+    TEST_FLAGS_ADD_V    = 22,
+    TEST_BR             = 23,
+    TEST_BR_FORWARD     = 24,
+    TEST_BR_BACKWARD    = 25,
+    TEST_BEQ            = 26,
+    TEST_BPL            = 27,
+    TEST_BNE            = 28
 } TestID;
 
 typedef struct {
@@ -59,6 +69,16 @@ static const TestCase test_table[] = {
     {TEST_MODE6_PC,         "test_mode6_pc",            test_mode6_pc},
     {TEST_MODE7_REG,        "test_mode7_reg",           test_mode7_reg},
     {TEST_MODE7_PC,         "test_mode7_pc",            test_mode7_pc},
+    {TEST_FLAGS_MOV_Z,      "test_flags_mov_z",         test_flags_mov_zero},
+    {TEST_FLAGS_MOV_N,      "test_flags_mov_n",         test_flags_mov_negative},
+    {TEST_FLAGS_ADD_C,      "test_flags_add_c",         test_flags_add_carry},
+    {TEST_FLAGS_ADD_V,      "test_flags_add_v",         test_flags_add_overflow},
+    {TEST_BR,               "test_br",                  test_br},
+    {TEST_BR_FORWARD,       "test_br_forward",          test_br_forward},
+    {TEST_BR_BACKWARD,      "test_br_backward",         test_br_backward},
+    {TEST_BEQ,              "test_beq",                 test_beq},
+    {TEST_BPL,              "test_bpl",                 test_bpl},
+    {TEST_BNE,              "test_bne",                 test_bne}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -73,7 +93,7 @@ void run_all_tests(void) {
         run_test_by_id(test_table[i].id);
     }
 
-    print_log(LOG_INFO, "=== ALL TEST GROUPS COMPLETED SUCCESSFULLY ===\n");
+    print_log(LOG_INFO, "=== ALL TEST COMPLETED SUCCESSFULLY ===\n");
 }
 
 void run_test_by_id(int id) {
@@ -85,24 +105,34 @@ void run_test_by_id(int id) {
     print_log(LOG_INFO, "=== STARTING SINGLE TEST ID: [%d] NAME: <%s> ===\n", id, test_table[id - 1].name);
 
     switch ((TestID)id) {
-        case TEST_MEM:              test_mem();               break;
-        case TEST_PARSE_MOV:        test_parse_mov();         break;
-        case TEST_MOV:              test_mov();               break;
-        case TEST_SOB:              test_sob();               break;
-        case TEST_CLR:              test_clr();             break;
-        case TEST_MODE0:            test_mode0();             break;
-        case TEST_MODE1_TOREG:      test_mode1_toreg();       break;
-        case TEST_MODE1_FROMREG:    test_mode1_fromreg();     break;
-        case TEST_MODE2_REG:        test_mode2_reg();         break;
-        case TEST_MODE2_PC:         test_mode2_pc();          break;
-        case TEST_MODE3_REG:        test_mode3_reg();         break;
-        case TEST_MODE3_PC:         test_mode3_pc();          break;
-        case TEST_MODE4:            test_mode4();             break;
-        case TEST_MODE5:            test_mode5();             break;
-        case TEST_MODE6_REG:        test_mode6_reg();         break;
-        case TEST_MODE6_PC:         test_mode6_pc();          break;
-        case TEST_MODE7_REG:        test_mode7_reg();         break;
-        case TEST_MODE7_PC:         test_mode7_pc();          break;
+        case TEST_MEM:              test_mem();                     break;
+        case TEST_PARSE_MOV:        test_parse_mov();               break;
+        case TEST_MOV:              test_mov();                     break;
+        case TEST_SOB:              test_sob();                     break;
+        case TEST_CLR:              test_clr();                     break;
+        case TEST_MODE0:            test_mode0();                   break;
+        case TEST_MODE1_TOREG:      test_mode1_toreg();             break;
+        case TEST_MODE1_FROMREG:    test_mode1_fromreg();           break;
+        case TEST_MODE2_REG:        test_mode2_reg();               break;
+        case TEST_MODE2_PC:         test_mode2_pc();                break;
+        case TEST_MODE3_REG:        test_mode3_reg();               break;
+        case TEST_MODE3_PC:         test_mode3_pc();                break;
+        case TEST_MODE4:            test_mode4();                   break;
+        case TEST_MODE5:            test_mode5();                   break;
+        case TEST_MODE6_REG:        test_mode6_reg();               break;
+        case TEST_MODE6_PC:         test_mode6_pc();                break;
+        case TEST_MODE7_REG:        test_mode7_reg();               break;
+        case TEST_MODE7_PC:         test_mode7_pc();                break;
+        case TEST_FLAGS_MOV_Z:      test_flags_mov_zero();          break;
+        case TEST_FLAGS_MOV_N:      test_flags_mov_negative();      break;
+        case TEST_FLAGS_ADD_C:      test_flags_add_carry();         break;
+        case TEST_FLAGS_ADD_V:      test_flags_add_overflow();      break;
+        case TEST_BR:               test_br();                      break;
+        case TEST_BR_FORWARD:       test_br_forward();              break;
+        case TEST_BR_BACKWARD:      test_br_backward();             break;
+        case TEST_BEQ:              test_beq();                     break;
+        case TEST_BPL:              test_bpl();                     break;
+        case TEST_BNE:              test_bne();                     break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===\n", test_table[id - 1].name);
@@ -299,11 +329,16 @@ void test_mode0(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
     reg[3] = 12;    // dd
     reg[5] = 34;    // ss
+
     parse_cmd(0010503);
+
     assert(ss.val == 34);
     assert(ss.adr == 5);
     assert(dd.val == 12);
     assert(dd.adr == 3);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
 }
 
@@ -328,8 +363,7 @@ void test_mode1_toreg(void) {
     assert(reg[5] == 0200);
 
     //clean
-    reg[3] = 0;
-    reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0200, 0, MEMSPACE);
 
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
@@ -358,8 +392,7 @@ void test_mode1_fromreg(void) {
     assert(reg[3] == 75);
 
     //clean
-    reg[3] = 0;
-    reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0400, 0, MEMSPACE);
 
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
@@ -390,8 +423,7 @@ void test_mode2_reg(void) {
     assert(reg[5] == 0202);
 
     //clean
-    reg[3] = 0;
-    reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(000200, 0, MEMSPACE);
 
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
@@ -418,8 +450,7 @@ void test_mode2_pc(void) {
     assert(PC == 02002);
 
     //clean
-    reg[3] = 0;
-    PC = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(02000, 0, MEMSPACE);
 
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
@@ -447,7 +478,7 @@ void test_mode3_reg(void) {
     assert(reg[5] == 0202);
 
     //clean
-    reg[3] = 0; reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0200, 0, MEMSPACE);
     w_write(0400, 0, MEMSPACE);
 
@@ -476,7 +507,7 @@ void test_mode3_pc(void) {
     assert(PC == 02002);
 
     //clean
-    reg[3] = 0; PC = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(02000, 0, MEMSPACE);
     w_write(0400, 0, MEMSPACE);
 
@@ -503,8 +534,7 @@ void test_mode4(void) {
     assert(reg[5] == 0400);
 
     //clean
-    reg[3] = 0;
-    reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0400, 0, MEMSPACE);
 
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
@@ -533,7 +563,7 @@ void test_mode5(void) {
     assert(reg[5] == 0400);
 
     //clean
-    reg[3] = 0; reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0400, 0, MEMSPACE);
     w_write(0600, 0, MEMSPACE);
 
@@ -566,7 +596,7 @@ void test_mode6_reg(void) {
     assert(reg[5] == 0200);
 
     //clean
-    reg[3] = 0; reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(02000, 0, MEMSPACE);
     w_write(0204, 0, MEMSPACE);
 
@@ -596,7 +626,7 @@ void test_mode6_pc(void) {
     assert(reg[3] == 123);
 
     //clean
-    reg[3] = 0; PC = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(02000, 0, MEMSPACE);
     w_write(02012, 0, MEMSPACE);
 
@@ -629,7 +659,7 @@ void test_mode7_reg(void) {
     assert(reg[5] == 0200);
 
     //clean
-    reg[3] = 0; reg[5] = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(02000, 0, MEMSPACE);
     w_write(0204, 0, MEMSPACE);
     w_write(0600, 0, MEMSPACE);
@@ -660,10 +690,264 @@ void test_mode7_pc(void) {
     assert(reg[3] == 150);
 
     //clean
-    reg[3] = 0; PC = 0;
+    for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(02000, 0, MEMSPACE);
     w_write(02012, 0, MEMSPACE);
     w_write(0700, 0, MEMSPACE);
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест в MOV на флаг Z = 1, остальные 0
+void test_flags_mov_zero(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup
+    flag_Z = 0; flag_N = 1; flag_V = 1;
+    reg[5] = 0; 
+
+    Command cmd = parse_cmd(0010503);
+
+    cmd.do_command();
+
+    assert(flag_Z == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_N = flag_Z = flag_V = flag_C = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест в MOV на флаг N = 1, остальные 0
+void test_flags_mov_negative(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup
+    flag_Z = 1; flag_N = 0; flag_V = 1;
+    reg[5] = 0177777;
+
+    Command cmd = parse_cmd(0010503);
+
+    cmd.do_command();
+
+    assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
+    
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_N = flag_Z = flag_V = flag_C = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест в ADD на C = 1 и Z = 1, остальные 0
+void test_flags_add_carry(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup
+    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 0;
+    reg[5] = 0177777;
+    reg[3] = 01;
+
+    Command cmd = parse_cmd(0060503);
+
+    cmd.do_command();
+
+    assert(reg[3] == 0);
+    assert(flag_Z == 1);
+    assert(flag_C == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_N = flag_Z = flag_V = flag_C = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест в ADD на V = 1 и N = 1, остальные 0
+void test_flags_add_overflow(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup
+    flag_N = 0; flag_Z = 1; flag_V = 0; flag_C = 1;
+    reg[5] = 040000;
+    reg[3] = 040000;
+
+    Command cmd = parse_cmd(0060503);
+    
+    cmd.do_command();
+
+    assert(flag_N == 1);
+    assert(flag_V == 1);
+    assert(flag_Z == 0);
+    assert(flag_C == 0);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_N = flag_Z = flag_V = flag_C = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на безусловный переход BR
+void test_br(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+
+    //setup
+    PC = 01002; 
+    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 0;
+
+    Command cmd = parse_cmd(0000400);
+    
+    assert(strcmp(cmd.name, "br") == 0);
+    assert(xx == 0); 
+
+    cmd.do_command();
+
+    assert(PC == 01002);
+    assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 1);
+    assert(flag_C == 0);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_N = flag_Z = flag_V = flag_C = 0;
+    xx = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на безусловный переход вперед
+void test_br_forward(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup
+    PC = 01002;
+
+    Command cmd = parse_cmd(0000402);
+    assert(xx == 2);
+
+    cmd.do_command();
+
+    assert(PC == 01006);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    xx = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на безусловный переход назад
+void test_br_backward(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup
+    PC = 01006;
+
+    Command cmd = parse_cmd(0000775);
+    assert(xx == -3);
+
+    cmd.do_command();
+
+    assert(PC == 01000);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    xx = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на условный переход по флагу нуля (Z = 1)
+void test_beq(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup Z = 1
+    flag_Z = 1;
+    PC = 01002;
+
+    Command cmd = parse_cmd(0001402);
+    cmd.do_command();
+
+    assert(PC == 01006);
+
+    //setup Z = 0
+    flag_Z = 0;
+    PC = 01002;
+
+    cmd.do_command();
+
+    assert(PC == 01002);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_Z = 0; 
+    xx = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на условный переход по флагу знака (N = 0)
+void test_bpl(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup N = 0
+    flag_N = 0;
+    PC = 01002;
+
+    Command cmd = parse_cmd(0100002);
+    cmd.do_command();
+
+    assert(PC == 01006);
+
+    //setup N = 1
+    flag_N = 1;
+    PC = 01002;
+
+    cmd.do_command();
+
+    assert(PC == 01002);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_N = 0; xx = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+}
+
+//тест на условный переход по флагу нуля (Z = 0)
+void test_bne(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    
+    //setup Z = 0
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_Z = 0;
+    PC = 01002;
+
+    Command cmd = parse_cmd(0001002);
+    cmd.do_command();
+
+    assert(PC == 01006);
+
+    //setup Z = 1
+    flag_Z = 1;
+    PC = 01002;
+
+    cmd.do_command();
+
+    assert(PC == 01002);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_Z = 0; xx = 0;
 
     print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
 }
