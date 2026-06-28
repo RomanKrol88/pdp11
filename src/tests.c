@@ -41,7 +41,8 @@ typedef enum {
     TEST_BR_BACKWARD    = 25,
     TEST_BEQ            = 26,
     TEST_BPL            = 27,
-    TEST_BNE            = 28
+    TEST_BNE            = 28,
+    TEST_TSTB           = 29
 } TestID;
 
 typedef struct {
@@ -78,7 +79,8 @@ static const TestCase test_table[] = {
     {TEST_BR_BACKWARD,      "test_br_backward",         test_br_backward},
     {TEST_BEQ,              "test_beq",                 test_beq},
     {TEST_BPL,              "test_bpl",                 test_bpl},
-    {TEST_BNE,              "test_bne",                 test_bne}
+    {TEST_BNE,              "test_bne",                 test_bne},
+    {TEST_TSTB,             "test_tstb",                test_tstb}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -86,23 +88,23 @@ static const TestCase test_table[] = {
 //1. Функции запуска тестов с флагами:
 
 void run_all_tests(void) {
-    print_log(LOG_INFO, "=== STARTING GLOBAL EMULATOR TEST SUITE ===\n");
+    print_log(LOG_INFO, "=== STARTING GLOBAL EMULATOR TEST SUITE ===");
 
 
     for (size_t i = 0; i < TEST_SIZE; i++) {
         run_test_by_id(test_table[i].id);
     }
 
-    print_log(LOG_INFO, "=== ALL TEST COMPLETED SUCCESSFULLY ===\n");
+    print_log(LOG_INFO, "=== ALL TEST COMPLETED SUCCESSFULLY ===");
 }
 
 void run_test_by_id(int id) {
     if (id < 1 || id >= (int)TEST_SIZE + 1) {
-        print_log(LOG_ERROR, "Error: Unknown Test ID %d\n", id);
+        print_log(LOG_ERROR, "Error: Unknown Test ID %d", id);
         exit(1);
     }
 
-    print_log(LOG_INFO, "=== STARTING SINGLE TEST ID: [%d] NAME: <%s> ===\n", id, test_table[id - 1].name);
+    print_log(LOG_INFO, "=== STARTING SINGLE TEST ID: [%d] NAME: <%s> ===", id, test_table[id - 1].name);
 
     switch ((TestID)id) {
         case TEST_MEM:              test_mem();                     break;
@@ -133,9 +135,10 @@ void run_test_by_id(int id) {
         case TEST_BEQ:              test_beq();                     break;
         case TEST_BPL:              test_bpl();                     break;
         case TEST_BNE:              test_bne();                     break;
+        case TEST_TSTB:             test_tstb();                    break;
     }
 
-    print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===\n", test_table[id - 1].name);
+    print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
 }
 
 void run_test_by_name(const char *name) {
@@ -145,7 +148,7 @@ void run_test_by_name(const char *name) {
             return;
         }
     }
-    print_log(LOG_ERROR, "Error: Test named '%s' not found!\n", name);
+    print_log(LOG_ERROR, "Error: Test named '%s' not found!", name);
     exit(1);
 }
 
@@ -158,30 +161,30 @@ void test_mem(void) {
     signed char signed_b0, signed_b1, signed_bres;
     signed short signed_w;
 
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //пишем байт, читаем байт
-    print_log(LOG_INFO, "Пишем и читаем байт по четному адресу\n");
+    print_log(LOG_INFO, "Пишем и читаем байт по четному адресу");
     a = 0;
     b0 = 0x12;
     b_write(a, b0);
     bres = b_read(a);
     //тут полезно написать отладочную печать a, b0, bres
-    print_log(LOG_TRACE, "a = %06o b0 = %hhx bres = %hhx\n", a, b0, bres);
+    print_log(LOG_TRACE, "a = %06o b0 = %hhx bres = %hhx", a, b0, bres);
     assert(b0 == bres);
     
     //пишем слово, читаем слово
-    print_log(LOG_INFO, "Пишем и читаем слово\n");
+    print_log(LOG_INFO, "Пишем и читаем слово");
     a = 2;        // другой адрес
     w = 0x3456;
     w_write(a, w, MEMSPACE);
     wres = w_read(a);
     //тут полезно написать отладочную печать a, w, wres
-    print_log(LOG_TRACE, "a = %06o w = %04x wres = %04x\n", a, w, wres);
+    print_log(LOG_TRACE, "a = %06o w = %04x wres = %04x", a, w, wres);
     assert(w == wres);
     
     //пишем 2 байта, читаем 1 слово
-    print_log(LOG_INFO, "Пишем 2 байта, читаем слово\n");
+    print_log(LOG_INFO, "Пишем 2 байта, читаем слово");
     a = 4;        // другой адрес
     w = 0xa1b2;
     //little-endian, младшие разряды по меньшему адресу
@@ -191,90 +194,90 @@ void test_mem(void) {
     b_write(a+1, b1);
     wres = w_read(a);
     //тут полезно написать отладочную печать a, w, wres
-    print_log(LOG_TRACE, "a = %06o b1 = %02hhx b0 = %02hhx wres = %04x\n", a, b1, b0, wres);
+    print_log(LOG_TRACE, "a = %06o b1 = %02hhx b0 = %02hhx wres = %04x", a, b1, b0, wres);
     assert(w == wres);
 
     //еще тесты:
 
     //чтение и запись байта по нечетному адресу
-    print_log(LOG_INFO, "Пишем и читаем байт по нечетному адресу\n");
+    print_log(LOG_INFO, "Пишем и читаем байт по нечетному адресу");
     a = 1;
     b0 = 0x78;
     b_write(a, b0);
     bres = b_read(a);
-    print_log(LOG_TRACE, "a = %06o b0 = %hhx bres = %hhx\n", a, b0, bres);
+    print_log(LOG_TRACE, "a = %06o b0 = %hhx bres = %hhx", a, b0, bres);
     assert(b0 == bres);
 
     //пишем слово, читаем побайтово (проверка Little-Endian)
-    print_log(LOG_INFO, "Пишем слово, читаем побайтово\n");
+    print_log(LOG_INFO, "Пишем слово, читаем побайтово");
     a = 6;
     w = 0xCDE1;
     w_write(a, w, MEMSPACE);
     b0 = b_read(a);     // должен быть младший байт: 0xE1
     b1 = b_read(a + 1); // должен быть старший байт: 0xCD
-    print_log(LOG_TRACE, "a = %06o w = %04x b1 = %02hhx b0 = %02hhx\n", a, w, b1, b0);
+    print_log(LOG_TRACE, "a = %06o w = %04x b1 = %02hhx b0 = %02hhx", a, w, b1, b0);
     assert(b0 == 0xE1);
     assert(b1 == 0xCD);
 
     //проверка отрицательных чисел (старший бит равен 1):
 
     //пишем и читаем отрицательный байт
-    print_log(LOG_INFO, "Пишем и читаем отрицательный байт\n");
+    print_log(LOG_INFO, "Пишем и читаем отрицательный байт");
     a = 1; 
     signed_b0 = -123; 
     b_write(a, (Byte)signed_b0);
     signed_bres = (signed char)b_read(a);
-    print_log(LOG_TRACE, "a = %06o signed_b0 = %d signed_bres = %d\n", a, signed_b0, signed_bres);
+    print_log(LOG_TRACE, "a = %06o signed_b0 = %d signed_bres = %d", a, signed_b0, signed_bres);
     assert(signed_b0 == signed_bres);
 
     //пишем отрицательное слово, читаем побайтово (проверка Little-Endian)
-    print_log(LOG_INFO, "Пишем отрицательное слово, читаем побайтово\n");
+    print_log(LOG_INFO, "Пишем отрицательное слово, читаем побайтово");
     a = 10;
     signed_w = -3678;    //0xF1A2
     w_write(a, (Word)signed_w, MEMSPACE);
     signed_b0 = (signed char)b_read(a);       //должен быть младший байт: 0xA2 (-94)
     signed_b1 = (signed char)b_read(a + 1);   //должен быт старший байт: 0xF1 (-15)
-    print_log(LOG_TRACE, "a = %06o signed_w = %04x signed_b1 = %d, signed_b0 = %d\n", a, (Word)signed_w, signed_b1, signed_b0);
+    print_log(LOG_TRACE, "a = %06o signed_w = %04x signed_b1 = %d, signed_b0 = %d", a, (Word)signed_w, signed_b1, signed_b0);
     assert(signed_b0 == (signed char)0xA2);
     assert(signed_b1 == (signed char)0xF1);
 
     /*
     //тесты, вызывающие падение программы:
-    print_log(LOG_INFO, "Пишем слово по нечетному адресу\n");
+    print_log(LOG_INFO, "Пишем слово по нечетному адресу");
     w_write(1, 0x1234); 
 
-    print_log(LOG_INFO, "Читаем слово по нечетному адресу\n");
+    print_log(LOG_INFO, "Читаем слово по нечетному адресу");
     w_read(3);
     */
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //3. Юнит-тесты для проверки работы с командами процессора:
 
 //тест на распознавание команды MOV, ADD, HALT
 void test_parse_mov(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     Command cmd = parse_cmd(0010604);
     assert(strcmp(cmd.name, "mov") == 0);
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на выполнение MOV по моде 0 в команде MOV R5, R3
  void test_mov(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     reg[3] = 12;    // dd
     reg[5] = 34;    // ss
     Command cmd = parse_cmd(0010503);
     cmd.do_command();
     assert(reg[3] == 34);
     assert(reg[5] == 34);
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на выполнение SOB в команде SOB R1, LOOP
 void test_sob(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup 1
     reg[1] = 5;       //счетчик цикла
@@ -301,12 +304,12 @@ void test_sob(void) {
 
     //clean
     reg[1] = 0; PC = 0;
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на выполнение CLR в команде CLR R4
 void test_clr(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[4] = 1234;
@@ -319,14 +322,14 @@ void test_clr(void) {
 
     //clean еще раз=)
     reg[4] = 0;
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //4. Юнит-тесты для проверки работы с модами адресации процессора:
 
 //тест на чтение аргументов ss и dd в MOV R5, R3
 void test_mode0(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     reg[3] = 12;    // dd
     reg[5] = 34;    // ss
 
@@ -339,12 +342,12 @@ void test_mode0(void) {
 
     //clean
     for (int i = 0; i < 8; i++) reg[i] = 0;
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на чтение аргументов ss и dd в MOV (R5), R3
 void test_mode1_toreg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     // setup
     reg[3] = 12;
     reg[5] = 0200;
@@ -366,12 +369,12 @@ void test_mode1_toreg(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0200, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на запись из регистра в память MOV R3, (R5)
 void test_mode1_fromreg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     //setup
     reg[3] = 75;
     reg[5] = 0400;
@@ -395,12 +398,12 @@ void test_mode1_fromreg(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0400, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на автоинкремент регистра MOV (R5)+, R3
 void test_mode2_reg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -426,12 +429,12 @@ void test_mode2_reg(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(000200, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на автоинкремент регистра R7 MOV #77, R3
 void test_mode2_pc(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -453,12 +456,12 @@ void test_mode2_pc(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(02000, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на автоинкремент косвенной моды регистра MOV @(R5)+, R3
 void test_mode3_reg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -482,12 +485,12 @@ void test_mode3_reg(void) {
     w_write(0200, 0, MEMSPACE);
     w_write(0400, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на автоинкремент абсолютного режима PC MOV @#400, R3
 void test_mode3_pc(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -511,12 +514,12 @@ void test_mode3_pc(void) {
     w_write(02000, 0, MEMSPACE);
     w_write(0400, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на автодекремент MOV R3, -(R5)
 void test_mode4(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 88;
@@ -537,12 +540,12 @@ void test_mode4(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     w_write(0400, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на автодекремент косвенной моды регистра MOV @-(R5), R3
 void test_mode5(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -567,12 +570,12 @@ void test_mode5(void) {
     w_write(0400, 0, MEMSPACE);
     w_write(0600, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на индексную адресацию регистра MOV 4(R5), R3 
 void test_mode6_reg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -600,12 +603,12 @@ void test_mode6_reg(void) {
     w_write(02000, 0, MEMSPACE);
     w_write(0204, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на относительную адресацию через PC MOV 10(PC), R3
 void test_mode6_pc(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -630,12 +633,12 @@ void test_mode6_pc(void) {
     w_write(02000, 0, MEMSPACE);
     w_write(02012, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на индексную косвенную адресацию регистра: MOV @4(R5), R3
 void test_mode7_reg(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -664,12 +667,12 @@ void test_mode7_reg(void) {
     w_write(0204, 0, MEMSPACE);
     w_write(0600, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на индексную косвенную адресацию регистра: MOV @4(R5), R3
 void test_mode7_pc(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     reg[3] = 0;
@@ -695,12 +698,12 @@ void test_mode7_pc(void) {
     w_write(02012, 0, MEMSPACE);
     w_write(0700, 0, MEMSPACE);
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест в MOV на флаг Z = 1, остальные 0
 void test_flags_mov_zero(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
     flag_Z = 0; flag_N = 1; flag_V = 1;
@@ -718,12 +721,12 @@ void test_flags_mov_zero(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_N = flag_Z = flag_V = flag_C = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест в MOV на флаг N = 1, остальные 0
 void test_flags_mov_negative(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
     flag_Z = 1; flag_N = 0; flag_V = 1;
@@ -741,12 +744,12 @@ void test_flags_mov_negative(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_N = flag_Z = flag_V = flag_C = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест в ADD на C = 1 и Z = 1, остальные 0
 void test_flags_add_carry(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
     flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 0;
@@ -767,12 +770,12 @@ void test_flags_add_carry(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_N = flag_Z = flag_V = flag_C = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест в ADD на V = 1 и N = 1, остальные 0
 void test_flags_add_overflow(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
     flag_N = 0; flag_Z = 1; flag_V = 0; flag_C = 1;
@@ -792,12 +795,12 @@ void test_flags_add_overflow(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_N = flag_Z = flag_V = flag_C = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на безусловный переход BR
 void test_br(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
     PC = 01002; 
@@ -821,12 +824,12 @@ void test_br(void) {
     flag_N = flag_Z = flag_V = flag_C = 0;
     xx = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на безусловный переход вперед
 void test_br_forward(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
     PC = 01002;
@@ -842,12 +845,12 @@ void test_br_forward(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     xx = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на безусловный переход назад
 void test_br_backward(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
     PC = 01006;
@@ -863,12 +866,12 @@ void test_br_backward(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     xx = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на условный переход по флагу нуля (Z = 1)
 void test_beq(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup Z = 1
     flag_Z = 1;
@@ -892,12 +895,12 @@ void test_beq(void) {
     flag_Z = 0; 
     xx = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на условный переход по флагу знака (N = 0)
 void test_bpl(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup N = 0
     flag_N = 0;
@@ -920,12 +923,12 @@ void test_bpl(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_N = 0; xx = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на условный переход по флагу нуля (Z = 0)
 void test_bne(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup Z = 0
     for (int i = 0; i < 8; i++) reg[i] = 0;
@@ -949,5 +952,45 @@ void test_bne(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_Z = 0; xx = 0;
 
-    print_log(LOG_TRACE,"Function <%s> is OK\n", __FUNCTION__);
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на выставление отрицательного байта N в TSTb
+void test_tstb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+    
+    //setup N = 1
+    flag_N = 0; flag_Z = 1; flag_V = 1; flag_C = 1;
+    
+    reg[4] = 0177775; 
+
+    Command cmd = parse_cmd(0105704);
+    
+    assert(strcmp(cmd.name, "tstb") == 0);
+
+    cmd.do_command();
+
+    assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
+
+    //setup N = 0
+    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 1;
+    reg[4] = 0;
+
+    cmd = parse_cmd(0105704);
+
+    cmd.do_command();
+
+    assert(flag_Z == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
+
+    //clean
+    for (int i = 0; i < 8; i++) reg[i] = 0;
+    flag_N = flag_Z = flag_V = flag_C = 0;
+
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }

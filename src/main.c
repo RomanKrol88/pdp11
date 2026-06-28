@@ -8,16 +8,15 @@
 
 int main (int argc, char * argv[])  {
   
-    set_log_level(LOG_DEBUG);
+    set_log_level(LOG_TRACE);
 
-    int testing_mode = 0;
+    const char * filename = (argc > 1) ? argv[1] : "test/data.txt";     //по-умолчанию используем файл data.txt
 
     //запуск программы в режиме тестирования
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--testall") == 0) {
             run_all_tests(); //запуск всех тестов
-            testing_mode = 1;
-            break;
+            return 0;
         }
         if (strcmp(argv[i], "--test") == 0) {
             if (i + 1 < argc) {
@@ -31,21 +30,15 @@ int main (int argc, char * argv[])  {
                 }
                 return 0; 
             } else {
-                print_log(LOG_ERROR, "Error: The --test option requires a test name or ID argument!\n");
+                print_log(LOG_ERROR, "Error: The --test option requires a test name or ID argument!");
                 return 1;
             }
         }
     }
-    //выполняем тест и выходим из режима тестирования
-    if (testing_mode) {
-        return 0;
-    }
 
-    print_log(LOG_INFO, "==================================================\n");
-    print_log(LOG_INFO, "         PDP-11 EMULATOR v1.0 BY ROMAN KROL       \n");
-    print_log(LOG_INFO, "==================================================\n");
-
-    const char * filename = (argc > 1) ? argv[1] : "test/data.txt";      //по-умолчанию используем файл data.txt
+    print_log(LOG_INFO, "==================================================");
+    print_log(LOG_INFO, "     PDP-11 EMULATOR v0.5 (beta) BY ROMAN KROL    ");
+    print_log(LOG_INFO, "==================================================");
 
     //load_data(stdin);
 

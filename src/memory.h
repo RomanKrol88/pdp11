@@ -1,5 +1,5 @@
 #ifndef MEMORY_H
-#define MEMOTY_H
+#define MEMORY_H
 
 #include "config.h"
 

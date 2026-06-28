@@ -19,6 +19,8 @@
 #define HAS_NN    (1 << 4)  //16 (010000) - NN (6 бит)
 #define HAS_XX    (1 << 5)  //32 (100000) - XX (8 бит)
 
+extern int output_print;    //переменная для беспрефиксного вывода stdout на дисплей
+
 //флаги условий регистра состояния PSW
 extern int flag_N;  //Negative (результат отрицательный)
 extern int flag_Z;  //Zero     (результат равен нулю)
@@ -61,6 +63,7 @@ void do_br(void);
 void do_bpl(void);
 void do_bne(void);
 void do_beq(void);
+void do_tstb(void);
 void do_nothing(void);
 
 #endif

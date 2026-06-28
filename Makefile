@@ -20,7 +20,7 @@ CFLAGS = -Wall -Wextra -Werror -Isrc -g -O0
 LIBS = -lm -fsanitize=address -fsanitize=undefined
 
 # Список всех исходных файлов, которые нужно скомпилировать
-SOURCES = src/pdp11.c src/memory.c src/logger.c src/cpu.c src/tests.c
+SOURCES = src/main.c src/memory.c src/logger.c src/cpu.c src/tests.c
 
 # Имя финального исполняемого файла (собирается в изолированную папку build)
 TARGET = build/pdp11
