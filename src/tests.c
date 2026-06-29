@@ -42,7 +42,8 @@ typedef enum {
     TEST_BEQ            = 26,
     TEST_BPL            = 27,
     TEST_BNE            = 28,
-    TEST_TSTB           = 29
+    TEST_TSTB           = 29,
+    TEST_JSR_RTS        = 30
 } TestID;
 
 typedef struct {
@@ -80,7 +81,8 @@ static const TestCase test_table[] = {
     {TEST_BEQ,              "test_beq",                 test_beq},
     {TEST_BPL,              "test_bpl",                 test_bpl},
     {TEST_BNE,              "test_bne",                 test_bne},
-    {TEST_TSTB,             "test_tstb",                test_tstb}
+    {TEST_TSTB,             "test_tstb",                test_tstb},
+    {TEST_JSR_RTS,          "test_jsr_rts",             test_jsr_rts}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -136,6 +138,7 @@ void run_test_by_id(int id) {
         case TEST_BPL:              test_bpl();                     break;
         case TEST_BNE:              test_bne();                     break;
         case TEST_TSTB:             test_tstb();                    break;
+        case TEST_JSR_RTS:          test_jsr_rts();                 break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -992,5 +995,52 @@ void test_tstb(void) {
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_N = flag_Z = flag_V = flag_C = 0;
 
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на вызов подпрограмм JSR/RTS по регистру R2
+void test_jsr_rts(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    SP = 0177700; 
+    reg[2] = 12;
+    
+    //SUBA
+    PC = 024616;
+    r = 2;
+    dd.adr = 046444; //адрес подпрограммы SUBA
+    
+    do_jsr();
+    
+    assert(reg[2] == 024616);
+    assert(w_read(SP) == 12);
+    assert(PC == 046444);
+    
+    //SUBB
+    PC = 046454;
+    r = 2;
+    dd.adr = 046466; //адрес подпрограммы SUBB
+    
+    do_jsr();
+    
+    assert(reg[2] == 046454);
+    assert(w_read(SP) == 024616);
+    assert(PC == 046466);
+
+    //возврат из SUBB
+    n = 2;
+    do_rts();
+    
+    assert(PC == 046454);
+    assert(reg[2] == 024616);
+    
+    //возврат из SUBA
+    n = 2;
+    do_rts();
+    
+    assert(PC == 024616);
+    assert(reg[2] == 12);
+    assert(SP == 0177700);
+    
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }

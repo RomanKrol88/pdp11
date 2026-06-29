@@ -7,10 +7,26 @@
 #include <ctype.h>
 
 int main (int argc, char * argv[])  {
-  
-    set_log_level(LOG_TRACE);
-
     const char * filename = (argc > 1) ? argv[1] : "test/data.txt";     //по-умолчанию используем файл data.txt
+
+    //ключи для выставления уровня логирования
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-logoff") == 0 || strcmp(argv[i], "-quiet") == 0) {
+            set_log_level(LOG_OFF);
+        }
+        if (strcmp(argv[i], "-error") == 0) {
+            set_log_level(LOG_ERROR);
+        }
+        if (strcmp(argv[i], "-info") == 0) {
+            set_log_level(LOG_INFO);
+        }
+        if (strcmp(argv[i], "-trace") == 0) {
+            set_log_level(LOG_TRACE);
+        }
+        if (strcmp(argv[i], "-debug") == 0) {
+            set_log_level(LOG_DEBUG);
+        }
+    }
 
     //запуск программы в режиме тестирования
     for (int i = 1; i < argc; i++) {
@@ -18,6 +34,7 @@ int main (int argc, char * argv[])  {
             run_all_tests(); //запуск всех тестов
             return 0;
         }
+
         if (strcmp(argv[i], "--test") == 0) {
             if (i + 1 < argc) {
                 const char *arg = argv[i + 1];

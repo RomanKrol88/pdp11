@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-Log_level current_log_level = LOG_OFF;           //по умолчанию логи отключены
+Log_level current_log_level = LOG_INFO;           //по умолчанию включены только информационные логи
 static const char* level_strings[] = {"PDP11 OUTPUT", "LOG_OFF", "LOG_ERROR", "LOG_INFO", "LOG_TRACE", "LOG_DEBUG"}; //наглядное оформление вывода логов
 
 int set_log_level(Log_level level) {
@@ -12,7 +12,11 @@ int set_log_level(Log_level level) {
 }
 
 void print_log(Log_level level, const char* format, ...) {
-    if (level < LOG_OUTPUT || level > LOG_DEBUG || level > current_log_level || current_log_level == LOG_OUTPUT) {
+    if (current_log_level == LOG_OFF && level != LOG_OUTPUT) {
+        return;
+    }
+
+    if (level > current_log_level || current_log_level == LOG_OUTPUT) {
         return;
     }
 

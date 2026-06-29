@@ -20,6 +20,8 @@ Command command[] = {   //таблица команд
     {0177400, 0001000,  "bne",      do_bne,     HAS_XX}, 
     {0177400, 0001400,  "beq",      do_beq,     HAS_XX},
     {0177700, 0105700,  "tstb",     do_tstb,    HAS_DD},
+    {0177000, 0004000,  "jsr",      do_jsr,     HAS_R | HAS_DD},
+    {0177770, 0000200,  "rts",      do_rts,     HAS_N},
     {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
 };
 
@@ -150,6 +152,18 @@ void run(void) {
             char dd_str[32] = "";
             format_arg(dd, w, dd_str);
             print_log(LOG_TRACE, "%06o %06o: %s %s", current_pc, w, cmd.name, dd_str);
+        } else if (strcmp(cmd.name, "jsr") == 0) {
+            char dd_str[32] = "";
+            format_arg(dd, w, dd_str);
+            if (r == 7) { 
+                print_log(LOG_TRACE, "%06o %06o: %s PC, %s", current_pc, w, cmd.name, dd_str);
+            }  else {
+                print_log(LOG_TRACE, "%06o %06o: %s R%d, %s", current_pc, w, cmd.name, r, dd_str);
+            }
+        } else if (strcmp(cmd.name, "rts") == 0) {
+            if (n == 7) print_log(LOG_TRACE, "%06o %06o: %s PC", current_pc, w, cmd.name);
+            else print_log(LOG_TRACE, "%06o %06o: %s R%d", current_pc, w, cmd.name, n);
+            
         } else {
             char ss_str[32] = "";
             char dd_str[32] = "";
@@ -385,6 +399,20 @@ void do_tstb(void) {
     flag_N = (b >> 7) & 1;
     flag_V = 0;
     flag_C = 0;
+}
+
+void do_jsr(void) {    
+    SP -= 2;
+    w_write(SP, reg[r], MEMSPACE);
+    reg[r] = PC;
+    PC = dd.adr;
+}
+
+void do_rts(void) {
+    int link_reg = n; 
+    PC = reg[link_reg];
+    reg[link_reg] = w_read(SP);
+    SP += 2;
 }
 
 void do_nothing(void) {

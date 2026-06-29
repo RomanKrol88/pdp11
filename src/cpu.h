@@ -64,6 +64,8 @@ void do_bpl(void);
 void do_bne(void);
 void do_beq(void);
 void do_tstb(void);
+void do_jsr(void);
+void do_rts(void);
 void do_nothing(void);
 
 #endif
