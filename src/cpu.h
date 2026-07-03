@@ -54,18 +54,26 @@ void set_flags_mov(Word val);                                   //функция
 void set_flags_add(Word src, Word dst, unsigned int res32);     //функция установки флагов для команды ADD
 
 //команды процессора:
-void do_halt(void);                                     //функция остановки HALT (opcode = 000000)
+void do_adcb(void);
 void do_add(void);                                      //..........НАПИСАТЬ ОПИСАНИЕ КОМАНД..........
-void do_mov(void);
-void do_sob(void);
-void do_clr(void);
-void do_br(void);
-void do_bpl(void);
-void do_bne(void);
+void do_ash(void);
+void do_ashc(void);
+void do_asl(void);
+void do_aslb(void);
+void do_asr(void);
+void do_asrb(void);
 void do_beq(void);
-void do_tstb(void);
+void do_bne(void);
+void do_bpl(void);
+void do_br(void);
+void do_clr(void);
+void do_halt(void);                                     //функция остановки HALT (opcode = 000000)
 void do_jsr(void);
+void do_mov(void);
 void do_rts(void);
+void do_sob(void);
+void do_tstb(void);
+
 void do_nothing(void);
 
 #endif

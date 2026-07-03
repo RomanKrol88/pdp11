@@ -22,6 +22,16 @@ void test_bpl(void);                        //тест на условный п�
 void test_bne(void);                        //тест на условный переход по флагу нуля (Z = 0)
 void test_tstb(void);                       //тест на выставление отрицательного байта N в TSTb
 void test_jsr_rts(void);                    //тест на вызов подпрограмм JSR/RTS по регистру R2
+void test_ash(void);                        //тест на проверку сдвига влево и сдвига вправо командой ASH
+void test_adcb(void);                       //тест на прибалвение переноса к байту командой ADCb
+void test_ashc(void);                       //тест на работу команды ASHC
+void test_asl(void);                        //тест на работу команды ASL со словом
+void test_aslb(void);                       //тест на работу команды ASLb с байтом
+void test_asr(void);                        //тест на работу команды ASR со словом
+void test_asrb(void);                       //тест на работу команды ASRb с байтом
+
+
+
 
 //4. Юнит-тесты для проверки работы с модами адресации процессора:
 void test_mode0(void);                      //тест на чтение аргументов ss и dd в MOV R5, R3

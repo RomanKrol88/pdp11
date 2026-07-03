@@ -10,19 +10,27 @@
 Word reg[REGSIZE];      //регистры процессора (дополнительная память)
 
 Command command[] = {   //таблица команд
+    {0177700, 0005500,  "adc",      do_adcb,    HAS_DD},
+    {0177700, 0105500,  "adcb",     do_adcb,    HAS_DD},
     {0170000, 0060000,  "add",      do_add,     HAS_SS | HAS_DD},
+    {0177000, 0072000,  "ash",      do_ash,     HAS_R | HAS_SS},
+    {0177000, 0073000,  "ashc",     do_ashc,    HAS_R | HAS_SS},
+    {0177700, 0006300,  "asl",      do_asl,     HAS_DD},
+    {0177700, 0106300,  "aslb",     do_aslb,    HAS_DD},
+    {0177700, 0006200,  "asr",      do_asr,     HAS_DD},
+    {0177700, 0106200,  "asrb",     do_asrb,    HAS_DD},
+    {0177400, 0001400,  "beq",      do_beq,     HAS_XX},
+    {0177400, 0001000,  "bne",      do_bne,     HAS_XX}, 
+    {0177400, 0100000,  "bpl",      do_bpl,     HAS_XX},
+    {0177400, 0000400,  "br",       do_br,      HAS_XX},
+    {0177700, 0005000,  "clr",      do_clr,     HAS_DD},
+    {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
+    {0177000, 0004000,  "jsr",      do_jsr,     HAS_R | HAS_DD},
     {0170000, 0010000,  "mov",      do_mov,     HAS_SS | HAS_DD},
     {0170000, 0110000,  "movb",     do_mov,     HAS_SS | HAS_DD},
-    {0177000, 0077000,  "sob",      do_sob,     HAS_R | HAS_NN},
-    {0177700, 0005000,  "clr",      do_clr,     HAS_DD},
-    {0177400, 0000400,  "br",       do_br,      HAS_XX},          
-    {0177400, 0100000,  "bpl",      do_bpl,     HAS_XX}, 
-    {0177400, 0001000,  "bne",      do_bne,     HAS_XX}, 
-    {0177400, 0001400,  "beq",      do_beq,     HAS_XX},
-    {0177700, 0105700,  "tstb",     do_tstb,    HAS_DD},
-    {0177000, 0004000,  "jsr",      do_jsr,     HAS_R | HAS_DD},
     {0177770, 0000200,  "rts",      do_rts,     HAS_N},
-    {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
+    {0177000, 0077000,  "sob",      do_sob,     HAS_R | HAS_NN},
+    {0177700, 0105700,  "tstb",     do_tstb,    HAS_DD}, 
 };
 
 #define COMMAND_COUNT (sizeof(command) / sizeof(command[0]))
@@ -88,8 +96,13 @@ Command parse_cmd(Word w) {
     for (size_t i = 0; i < COMMAND_COUNT; i++) {
         if ((w & command[i].mask) == command[i].opcode) {   
             //проверка флага SS
-            if (command[i].params & HAS_SS) {
-                ss = get_mr(w >> 6);
+            if ((command[i].params & HAS_R) && (command[i].params & HAS_SS)) {
+                ss = get_mr(w); //забираем из младших 6 бит для ASH/ASHC
+            } else {
+                //обычные двухадресные команды (mov, add), у них SS в битах 6-11
+                if (command[i].params & HAS_SS) {
+                    ss = get_mr(w >> 6);
+                }
             }
             //проверка флага DD
             if (command[i].params & HAS_DD) {
@@ -148,7 +161,10 @@ void run(void) {
         } else if (strcmp(cmd.name, "sob") == 0) {
             Address target_pc = PC - 2 * nn; 
             print_log(LOG_TRACE, "%06o %06o: %s R%d, %06o", current_pc, w, cmd.name, r, target_pc);
-        } else if (strcmp(cmd.name, "clr") == 0 || strcmp(cmd.name, "tstb") == 0) {
+        } else if (strcmp(cmd.name, "clr") == 0 || strcmp(cmd.name, "tstb") == 0 ||
+                   strcmp(cmd.name, "adcb") == 0 || strcmp(cmd.name, "adc") == 0 ||
+                   strcmp(cmd.name, "aslb") == 0 || strcmp(cmd.name, "asrb") == 0 ||
+                   strcmp(cmd.name, "asl") == 0  || strcmp(cmd.name, "asr") == 0) {
             char dd_str[32] = "";
             format_arg(dd, w, dd_str);
             print_log(LOG_TRACE, "%06o %06o: %s %s", current_pc, w, cmd.name, dd_str);
@@ -157,13 +173,23 @@ void run(void) {
             format_arg(dd, w, dd_str);
             if (r == 7) { 
                 print_log(LOG_TRACE, "%06o %06o: %s PC, %s", current_pc, w, cmd.name, dd_str);
-            }  else {
+            } else {
                 print_log(LOG_TRACE, "%06o %06o: %s R%d, %s", current_pc, w, cmd.name, r, dd_str);
             }
         } else if (strcmp(cmd.name, "rts") == 0) {
-            if (n == 7) print_log(LOG_TRACE, "%06o %06o: %s PC", current_pc, w, cmd.name);
-            else print_log(LOG_TRACE, "%06o %06o: %s R%d", current_pc, w, cmd.name, n);
-            
+            if (n == 7) {
+                print_log(LOG_TRACE, "%06o %06o: %s PC", current_pc, w, cmd.name);
+            } else {
+                print_log(LOG_TRACE, "%06o %06o: %s R%d", current_pc, w, cmd.name, n);
+            }
+        } else if (strcmp(cmd.name, "ash") == 0) {
+            char ss_str[32] = "";
+            format_arg(ss, w, ss_str); // Извлекаем аргумент источника (счетчик сдвига)
+            print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, ss_str, r);
+        } else if (strcmp(cmd.name, "ashc") == 0) {
+            char ss_str[32] = "";
+            format_arg(ss, w, ss_str);
+            print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, ss_str, r);
         } else {
             char ss_str[32] = "";
             char dd_str[32] = "";
@@ -366,6 +392,55 @@ void do_sob(void) {
     }
 }
 
+void do_ash(void) {
+    int count = ss.val & 077;
+    if (count & 040) {
+        count |= ~077;
+    }
+
+    if (count == 0) {
+        flag_C = 0;
+        flag_V = 0;
+        flag_Z = (reg[r] == 0) ? 1 : 0;
+        flag_N = (reg[r] >> 15) & 1;
+        return;
+    }
+
+    Word old_val = reg[r];
+    Word res = old_val;
+    flag_C = 0;
+    flag_V = 0;
+
+    if (count > 0) {
+        if (count <= 16) {
+            flag_C = (old_val >> (16 - count)) & 1;
+            res = (old_val << count) & 0177777;
+            if ((res >> 15) != (old_val >> 15)) {
+                flag_V = 1;
+            }
+        } else {
+            res = 0;
+            flag_C = 0;
+            if (old_val != 0) flag_V = 1;
+        }
+    } 
+    else if (count < 0) {
+        int shift = -count;
+        if (shift <= 16) {
+            flag_C = (old_val >> (shift - 1)) & 1;
+            short signed_val = (short)old_val;
+            res = (Word)((signed_val >> shift) & 0177777);
+        } else {
+            res = ((old_val >> 15) & 1) ? 0177777 : 0;
+            flag_C = (old_val >> 15) & 1;
+        }
+    }
+
+    reg[r] = res;
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 15) & 1;
+}
+
 void do_clr(void) {
     w_write(dd.adr, 0, dd.space);   //обнуляем регистр
 }
@@ -413,6 +488,133 @@ void do_rts(void) {
     PC = reg[link_reg];
     reg[link_reg] = w_read(SP);
     SP += 2;
+}
+
+void do_adcb(void) {
+    int old_c = flag_C;
+
+    if (byte_cmd) {
+        //работа с байтами
+        Byte old_val = (Byte)(dd.val & 0xFF);
+        unsigned int res32 = (unsigned int)old_val + (unsigned int)old_c;
+        Byte final_res = (Byte)(res32 & 0xFF);
+
+        if (dd.space == REGSPACE) {
+            reg[dd.adr] = (signed char)final_res;
+        } else {
+            b_write(dd.adr, final_res);
+        }
+
+        flag_Z = (final_res == 0) ? 1 : 0;
+        flag_N = (final_res >> 7) & 1;
+        flag_C = (res32 > 0xFF) ? 1 : 0;
+        flag_V = (old_val == 0177 && old_c == 1) ? 1 : 0;
+    } else {
+        //работа со словом
+        Word old_val = dd.val;
+        unsigned int res32 = (unsigned int)old_val + (unsigned int)old_c;
+        Word final_res = (Word)(res32 & 0177777);
+
+        w_write(dd.adr, final_res, dd.space);
+
+        flag_Z = (final_res == 0) ? 1 : 0;
+        flag_N = (final_res >> 15) & 1;
+        flag_C = (res32 > 0177777) ? 1 : 0;
+        flag_V = (old_val == 077777 && old_c == 1) ? 1 : 0;
+    }
+}
+
+void do_ashc(void) {
+    int count = ss.val & 077;
+    if (count & 040) count |= ~077;
+
+    int r_high = r;
+    int r_low = r | 1;
+    unsigned int old_32 = ((unsigned int)reg[r_high] << 16) | (reg[r_low] & 0xFFFF);
+    unsigned int res_32 = old_32;
+    
+    flag_C = 0;
+    flag_V = 0;
+
+    if (count > 0) {
+        if (count <= 32) {
+            flag_C = (old_32 >> (32 - count)) & 1;
+            res_32 = old_32 << count;
+            if ((res_32 >> 31) != (old_32 >> 31)) flag_V = 1;
+        } else {
+            res_32 = 0;
+            flag_C = 0;
+        }
+    } else if (count < 0) {
+        int shift = -count;
+        if (shift <= 32) {
+            flag_C = (old_32 >> (shift - 1)) & 1;
+            int signed_32 = (int)old_32;
+            res_32 = (unsigned int)(signed_32 >> shift);
+        } else {
+            res_32 = (old_32 >> 31) & 1 ? 0xFFFFFFFF : 0;
+            flag_C = (old_32 >> 31) & 1;
+        }
+    }
+
+    reg[r_high] = (Word)((res_32 >> 16) & 0177777);
+    reg[r_low] = (Word)(res_32 & 0177777);
+
+    flag_Z = (res_32 == 0) ? 1 : 0;
+    flag_N = (res_32 >> 31) & 1;
+}
+
+void do_aslb(void) {
+    Byte old_val = (Byte)(dd.val & 0xFF);
+    flag_C = (old_val >> 7) & 1;
+    
+    Byte res = (Byte)((old_val << 1) & 0xFF);
+    
+    if (dd.space == REGSPACE) reg[dd.adr] = (signed char)res;
+    else b_write(dd.adr, res);
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 7) & 1;
+    flag_V = flag_N ^ flag_C;
+}
+
+void do_asrb(void) {
+    Byte old_val = (Byte)(dd.val & 0xFF);
+    flag_C = old_val & 1;
+    signed char signed_b = (signed char)old_val;
+    Byte res = (Byte)((signed_b >> 1) & 0xFF);
+    
+    if (dd.space == REGSPACE) reg[dd.adr] = (signed char)res;
+    else b_write(dd.adr, res);
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 7) & 1;
+    flag_V = flag_N ^ flag_C;
+}
+
+void do_asl(void) {
+    Word old_val = dd.val;
+    flag_C = (old_val >> 15) & 1; 
+    
+    Word res = (Word)((old_val << 1) & 0177777);
+    w_write(dd.adr, res, dd.space);
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 15) & 1;
+    flag_V = flag_N ^ flag_C;
+}
+
+void do_asr(void) {
+    Word old_val = dd.val;
+    flag_C = old_val & 1; 
+    
+    short signed_w = (short)old_val;
+    Word res = (Word)((signed_w >> 1) & 0177777);
+    w_write(dd.adr, res, dd.space);
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 15) & 1;
+    flag_V = flag_N ^ flag_C;
 }
 
 void do_nothing(void) {

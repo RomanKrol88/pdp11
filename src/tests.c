@@ -43,7 +43,14 @@ typedef enum {
     TEST_BPL            = 27,
     TEST_BNE            = 28,
     TEST_TSTB           = 29,
-    TEST_JSR_RTS        = 30
+    TEST_JSR_RTS        = 30,
+    TEST_ASH            = 31,
+    TEST_ADCB           = 32,
+    TEST_ASHC           = 33,
+    TEST_ASL            = 34,
+    TEST_ASLB           = 35,
+    TEST_ASR            = 36,
+    TEST_ASRB           = 37
 } TestID;
 
 typedef struct {
@@ -82,7 +89,15 @@ static const TestCase test_table[] = {
     {TEST_BPL,              "test_bpl",                 test_bpl},
     {TEST_BNE,              "test_bne",                 test_bne},
     {TEST_TSTB,             "test_tstb",                test_tstb},
-    {TEST_JSR_RTS,          "test_jsr_rts",             test_jsr_rts}
+    {TEST_JSR_RTS,          "test_jsr_rts",             test_jsr_rts},
+    {TEST_ASH,              "test_ash",                 test_ash},
+    {TEST_ADCB,             "test_adcb",                test_adcb},
+    {TEST_ASHC,             "test_ashc",                test_ashc},
+    {TEST_ASL,               "test_asl",                 test_asl},
+    {TEST_ASLB,             "test_aslb",                test_aslb},
+    {TEST_ASR,              "test_asr",                 test_asr},
+    {TEST_ASRB,             "test_asrb",                test_asrb}
+
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -109,36 +124,43 @@ void run_test_by_id(int id) {
     print_log(LOG_INFO, "=== STARTING SINGLE TEST ID: [%d] NAME: <%s> ===", id, test_table[id - 1].name);
 
     switch ((TestID)id) {
-        case TEST_MEM:              test_mem();                     break;
-        case TEST_PARSE_MOV:        test_parse_mov();               break;
-        case TEST_MOV:              test_mov();                     break;
-        case TEST_SOB:              test_sob();                     break;
-        case TEST_CLR:              test_clr();                     break;
-        case TEST_MODE0:            test_mode0();                   break;
-        case TEST_MODE1_TOREG:      test_mode1_toreg();             break;
-        case TEST_MODE1_FROMREG:    test_mode1_fromreg();           break;
-        case TEST_MODE2_REG:        test_mode2_reg();               break;
-        case TEST_MODE2_PC:         test_mode2_pc();                break;
-        case TEST_MODE3_REG:        test_mode3_reg();               break;
-        case TEST_MODE3_PC:         test_mode3_pc();                break;
-        case TEST_MODE4:            test_mode4();                   break;
-        case TEST_MODE5:            test_mode5();                   break;
-        case TEST_MODE6_REG:        test_mode6_reg();               break;
-        case TEST_MODE6_PC:         test_mode6_pc();                break;
-        case TEST_MODE7_REG:        test_mode7_reg();               break;
-        case TEST_MODE7_PC:         test_mode7_pc();                break;
-        case TEST_FLAGS_MOV_Z:      test_flags_mov_zero();          break;
-        case TEST_FLAGS_MOV_N:      test_flags_mov_negative();      break;
-        case TEST_FLAGS_ADD_C:      test_flags_add_carry();         break;
-        case TEST_FLAGS_ADD_V:      test_flags_add_overflow();      break;
-        case TEST_BR:               test_br();                      break;
-        case TEST_BR_FORWARD:       test_br_forward();              break;
-        case TEST_BR_BACKWARD:      test_br_backward();             break;
-        case TEST_BEQ:              test_beq();                     break;
-        case TEST_BPL:              test_bpl();                     break;
-        case TEST_BNE:              test_bne();                     break;
-        case TEST_TSTB:             test_tstb();                    break;
-        case TEST_JSR_RTS:          test_jsr_rts();                 break;
+        case TEST_MEM           :   test_mem();                     break;
+        case TEST_PARSE_MOV     :   test_parse_mov();               break;
+        case TEST_MOV           :   test_mov();                     break;
+        case TEST_SOB           :   test_sob();                     break;
+        case TEST_CLR           :   test_clr();                     break;
+        case TEST_MODE0         :   test_mode0();                   break;
+        case TEST_MODE1_TOREG   :   test_mode1_toreg();             break;
+        case TEST_MODE1_FROMREG :   test_mode1_fromreg();           break;
+        case TEST_MODE2_REG     :   test_mode2_reg();               break;
+        case TEST_MODE2_PC      :   test_mode2_pc();                break;
+        case TEST_MODE3_REG     :   test_mode3_reg();               break;
+        case TEST_MODE3_PC      :   test_mode3_pc();                break;
+        case TEST_MODE4         :   test_mode4();                   break;
+        case TEST_MODE5         :   test_mode5();                   break;
+        case TEST_MODE6_REG     :   test_mode6_reg();               break;
+        case TEST_MODE6_PC      :   test_mode6_pc();                break;
+        case TEST_MODE7_REG     :   test_mode7_reg();               break;
+        case TEST_MODE7_PC      :   test_mode7_pc();                break;
+        case TEST_FLAGS_MOV_Z   :   test_flags_mov_zero();          break;
+        case TEST_FLAGS_MOV_N   :   test_flags_mov_negative();      break;
+        case TEST_FLAGS_ADD_C   :   test_flags_add_carry();         break;
+        case TEST_FLAGS_ADD_V   :   test_flags_add_overflow();      break;
+        case TEST_BR            :   test_br();                      break;
+        case TEST_BR_FORWARD    :   test_br_forward();              break;
+        case TEST_BR_BACKWARD   :   test_br_backward();             break;
+        case TEST_BEQ           :   test_beq();                     break;
+        case TEST_BPL           :   test_bpl();                     break;
+        case TEST_BNE           :   test_bne();                     break;
+        case TEST_TSTB          :   test_tstb();                    break;
+        case TEST_JSR_RTS       :   test_jsr_rts();                 break;
+        case TEST_ASH           :   test_ash();                     break;
+        case TEST_ADCB          :   test_adcb();                    break;
+        case TEST_ASHC          :   test_ashc();                    break;
+        case TEST_ASL           :   test_asl();                     break;
+        case TEST_ASLB          :   test_aslb();                    break;
+        case TEST_ASR           :   test_asr();                     break;
+        case TEST_ASRB          :   test_asrb();                    break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -155,6 +177,31 @@ void run_test_by_name(const char *name) {
     exit(1);
 }
 
+//вспомогательная функция для сброса всех регистров и флагов процессора в исходное состояние (clear)
+static void reset_cpu_state(void) {
+    //обнуление регистров
+    for (int i = 0; i < REGSIZE; i++) {
+        reg[i] = 0;
+    }
+    //сброс флагов условий регистра состояния PSW
+    flag_N = 0;
+    flag_Z = 0;
+    flag_V = 0;
+    flag_C = 0;
+    
+    //очистка служебных переменных декодера
+    byte_cmd = 0;
+    r = 0;
+    n = 0;
+    nn = 0;
+    xx = 0;
+    
+    //сброс структуры операндов
+    ss.val = 0; ss.adr = 0; ss.space = 0;
+    dd.val = 0; dd.adr = 0; dd.space = 0;
+}
+
+
 //2. Юнит-тесты для проверки работы с оперативной памятью:
 
 void test_mem(void) {
@@ -167,7 +214,6 @@ void test_mem(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //пишем байт, читаем байт
-    print_log(LOG_INFO, "Пишем и читаем байт по четному адресу");
     a = 0;
     b0 = 0x12;
     b_write(a, b0);
@@ -177,7 +223,6 @@ void test_mem(void) {
     assert(b0 == bres);
     
     //пишем слово, читаем слово
-    print_log(LOG_INFO, "Пишем и читаем слово");
     a = 2;        // другой адрес
     w = 0x3456;
     w_write(a, w, MEMSPACE);
@@ -187,7 +232,6 @@ void test_mem(void) {
     assert(w == wres);
     
     //пишем 2 байта, читаем 1 слово
-    print_log(LOG_INFO, "Пишем 2 байта, читаем слово");
     a = 4;        // другой адрес
     w = 0xa1b2;
     //little-endian, младшие разряды по меньшему адресу
@@ -203,7 +247,6 @@ void test_mem(void) {
     //еще тесты:
 
     //чтение и запись байта по нечетному адресу
-    print_log(LOG_INFO, "Пишем и читаем байт по нечетному адресу");
     a = 1;
     b0 = 0x78;
     b_write(a, b0);
@@ -212,7 +255,6 @@ void test_mem(void) {
     assert(b0 == bres);
 
     //пишем слово, читаем побайтово (проверка Little-Endian)
-    print_log(LOG_INFO, "Пишем слово, читаем побайтово");
     a = 6;
     w = 0xCDE1;
     w_write(a, w, MEMSPACE);
@@ -225,7 +267,6 @@ void test_mem(void) {
     //проверка отрицательных чисел (старший бит равен 1):
 
     //пишем и читаем отрицательный байт
-    print_log(LOG_INFO, "Пишем и читаем отрицательный байт");
     a = 1; 
     signed_b0 = -123; 
     b_write(a, (Byte)signed_b0);
@@ -234,7 +275,6 @@ void test_mem(void) {
     assert(signed_b0 == signed_bres);
 
     //пишем отрицательное слово, читаем побайтово (проверка Little-Endian)
-    print_log(LOG_INFO, "Пишем отрицательное слово, читаем побайтово");
     a = 10;
     signed_w = -3678;    //0xF1A2
     w_write(a, (Word)signed_w, MEMSPACE);
@@ -261,20 +301,35 @@ void test_mem(void) {
 //тест на распознавание команды MOV, ADD, HALT
 void test_parse_mov(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
     Command cmd = parse_cmd(0010604);
+
     assert(strcmp(cmd.name, "mov") == 0);
+
+    //clean
+    reset_cpu_state();
+
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на выполнение MOV по моде 0 в команде MOV R5, R3
  void test_mov(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
     reg[3] = 12;    // dd
     reg[5] = 34;    // ss
     Command cmd = parse_cmd(0010503);
+
     cmd.do_command();
+
     assert(reg[3] == 34);
     assert(reg[5] == 34);
+
+    //clean
+    reset_cpu_state();
+
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
@@ -306,7 +361,8 @@ void test_sob(void) {
     assert(PC == 001020);
 
     //clean
-    reg[1] = 0; PC = 0;
+    reset_cpu_state();
+
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
@@ -323,8 +379,9 @@ void test_clr(void) {
 
     assert(reg[4] == 0);
 
-    //clean еще раз=)
-    reg[4] = 0;
+    //clean
+    reset_cpu_state();
+
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
@@ -344,7 +401,8 @@ void test_mode0(void) {
     assert(dd.adr == 3);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
+    reset_cpu_state();
+
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
@@ -369,8 +427,7 @@ void test_mode1_toreg(void) {
     assert(reg[5] == 0200);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(0200, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -398,8 +455,7 @@ void test_mode1_fromreg(void) {
     assert(reg[3] == 75);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(0400, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -429,8 +485,7 @@ void test_mode2_reg(void) {
     assert(reg[5] == 0202);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(000200, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -456,8 +511,7 @@ void test_mode2_pc(void) {
     assert(PC == 02002);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(02000, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -484,9 +538,7 @@ void test_mode3_reg(void) {
     assert(reg[5] == 0202);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(0200, 0, MEMSPACE);
-    w_write(0400, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -513,9 +565,7 @@ void test_mode3_pc(void) {
     assert(PC == 02002);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(02000, 0, MEMSPACE);
-    w_write(0400, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -540,8 +590,7 @@ void test_mode4(void) {
     assert(reg[5] == 0400);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(0400, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -569,9 +618,7 @@ void test_mode5(void) {
     assert(reg[5] == 0400);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(0400, 0, MEMSPACE);
-    w_write(0600, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -602,9 +649,7 @@ void test_mode6_reg(void) {
     assert(reg[5] == 0200);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(02000, 0, MEMSPACE);
-    w_write(0204, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -632,9 +677,7 @@ void test_mode6_pc(void) {
     assert(reg[3] == 123);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(02000, 0, MEMSPACE);
-    w_write(02012, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -665,10 +708,7 @@ void test_mode7_reg(void) {
     assert(reg[5] == 0200);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(02000, 0, MEMSPACE);
-    w_write(0204, 0, MEMSPACE);
-    w_write(0600, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -696,10 +736,7 @@ void test_mode7_pc(void) {
     assert(reg[3] == 150);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    w_write(02000, 0, MEMSPACE);
-    w_write(02012, 0, MEMSPACE);
-    w_write(0700, 0, MEMSPACE);
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -721,8 +758,7 @@ void test_flags_mov_zero(void) {
     assert(flag_V == 0);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_N = flag_Z = flag_V = flag_C = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -744,8 +780,7 @@ void test_flags_mov_negative(void) {
     assert(flag_V == 0);
     
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_N = flag_Z = flag_V = flag_C = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -770,8 +805,7 @@ void test_flags_add_carry(void) {
     assert(flag_V == 0);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_N = flag_Z = flag_V = flag_C = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -795,8 +829,7 @@ void test_flags_add_overflow(void) {
     assert(flag_C == 0);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_N = flag_Z = flag_V = flag_C = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -823,9 +856,7 @@ void test_br(void) {
     assert(flag_C == 0);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_N = flag_Z = flag_V = flag_C = 0;
-    xx = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -845,8 +876,7 @@ void test_br_forward(void) {
     assert(PC == 01006);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    xx = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -866,8 +896,7 @@ void test_br_backward(void) {
     assert(PC == 01000);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    xx = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -894,9 +923,7 @@ void test_beq(void) {
     assert(PC == 01002);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_Z = 0; 
-    xx = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -923,8 +950,7 @@ void test_bpl(void) {
     assert(PC == 01002);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_N = 0; xx = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -952,8 +978,7 @@ void test_bne(void) {
     assert(PC == 01002);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_Z = 0; xx = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -992,8 +1017,7 @@ void test_tstb(void) {
     assert(flag_C == 0);
 
     //clean
-    for (int i = 0; i < 8; i++) reg[i] = 0;
-    flag_N = flag_Z = flag_V = flag_C = 0;
+    reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
@@ -1041,6 +1065,168 @@ void test_jsr_rts(void) {
     assert(PC == 024616);
     assert(reg[2] == 12);
     assert(SP == 0177700);
+
+    //clean
+    reset_cpu_state();
     
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на проверку сдвига влево и сдвига вправо командой ASH
+void test_ash(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup двиг влево
+    reg[2] = 4;
+    r = 2;
+    ss.val = 1;
+    do_ash();
+    assert(reg[2] == 8);
+    assert(flag_Z == 0);
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //setup сдвиг вправо
+    reg[2] = 0177760; 
+    r = 2;
+    ss.val = 076;      
+    do_ash();
+
+    assert(reg[2] == 0177774); 
+    assert(flag_N == 1);
+    assert(flag_C == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на прибалвение переноса к байту командой ADCb
+void test_adcb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[4] = 5;
+    byte_cmd = 1;
+    flag_C = 1;
+    dd.val = 5;
+    dd.adr = 4;
+    dd.space = REGSPACE;
+
+    do_adcb();
+
+    assert(reg[4] == 6);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды ASHC
+void test_ashc(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[2] = 0; reg[3] = 0100000;
+    r = 2; ss.val = 1;
+
+    do_ashc();
+
+    assert(reg[2] == 1);
+    assert(reg[3] == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды ASL со словом
+void test_asl(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[1] = 0100000;
+    byte_cmd = 0;
+    dd.val = 0100000; dd.adr = 1; dd.space = REGSPACE;
+
+    do_asl();
+
+    assert(reg[1] == 0);
+    assert(flag_Z == 1);
+    assert(flag_C == 1);
+    
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды ASLb с байтом
+void test_aslb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[4] = 0200;
+    byte_cmd = 1;
+    dd.val = 0200; dd.adr = 4; dd.space = REGSPACE;
+
+    do_aslb();
+
+    assert((reg[4] & 0xFF) == 0);
+    assert(flag_Z == 1);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды R со словом
+void test_asr(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[2] = 0100001;
+    byte_cmd = 0;
+    dd.val = 0100001; dd.adr = 2; dd.space = REGSPACE;
+
+    do_asr();
+
+    assert(reg[2] == 0140000);
+    assert(flag_C == 1);
+    assert(flag_N == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды ASRb с байтом
+void test_asrb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[5] = 0201;
+    byte_cmd = 1;
+    dd.val = 0201; dd.adr = 5; dd.space = REGSPACE;
+
+    do_asrb();
+
+    assert((reg[5] & 0xFF) == 0300);
+    assert(flag_C == 1); // Младший бит ушел в C
+    assert(flag_N == 1);
+
+    //clean
+    reset_cpu_state();
+
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
