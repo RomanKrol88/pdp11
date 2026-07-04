@@ -18,7 +18,7 @@ void test_br(void);                         //тест на безусловны
 void test_br_forward(void);                 //тест на безусловный переход вперед
 void test_br_backward(void);                //тест на безусловный переход назад
 void test_branches(void);                   //тест (комплексная верификация) работы условных ветвлений
-void test_tstb(void);                       //тест на выставление отрицательного байта N в TSTb
+void test_tst(void);                        //тест на выставление отрицательного байта N в TST и TSTb
 void test_jsr_rts(void);                    //тест на вызов подпрограмм JSR/RTS по регистру R2
 void test_ash(void);                        //тест на проверку сдвига влево и сдвига вправо командой ASH
 void test_adcb(void);                       //тест на прибалвение переноса к байту командой ADCb
@@ -29,8 +29,24 @@ void test_asr(void);                        //тест на работу ком�
 void test_asrb(void);                       //тест на работу команды ASRb с байтом
 void test_bit_logic_bytes(void);            //тест на работу байтовых логических команд BICb, BISb, BITb
 void test_clear_flags(void);                //тест на работу команд очистки флагов CLC, CLV, CLZ, CLN, CCC
-
-
+void test_cmpb(void);                       //тест на работу команды сравнения байт CMPb
+void test_comb(void);                       //тест на работу команды байтовой инверсии COMb
+void test_decb(void);                       //тест на работу команды декремента DECb
+void test_inc(void);                        //тест на работу команды инкремента INC
+void test_jmp(void);                        //тест на работу команды безусловного перехода JMP
+void test_negb(void);                       //тест на работу команды смены знака NEGb
+void test_nop(void);                        //тест на работу пустой команды NOP
+void test_reset(void);                      //тест на работу сброса командой RESET
+void test_rolb(void);                       //тест на работу циклического сдвига влево командой ROLb
+void test_rorb(void);                       //тест на работу циклического сдвига вправо командой ROLb
+void test_sbcb(void);                       //тест на работу команды байтового вычитания переноса SBCb
+void test_set_flags(void);                  //тест на работу команд установки флагов
+void test_sub(void);                        //тест на вычитание командой SUB
+void test_swab(void);                       //тест на перестановку байт командой SWAb
+void test_sxt(void);                        //тест на знаковое расширение флага N командой SXT
+void test_xor(void);                        //тест на исключающее ИЛИ командой XOR
+void test_mul(void);                        //тест на умножение командой MUL
+void test_div(void);                        //тест на деление командой DIV
 
 
 //4. Юнит-тесты для проверки работы с модами адресации процессора:

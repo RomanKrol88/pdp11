@@ -23,7 +23,8 @@ Command command[] = {   //таблица команд
     {0177400, 0003000,  "bcs",      do_bcs,     HAS_XX}, 
     {0177400, 0002000,  "bge",      do_bge,     HAS_XX}, 
     {0177400, 0003000,  "bgt",      do_bgt,     HAS_XX},
-    {0170000, 0140000,  "bicb",     do_bicb,    HAS_SS | HAS_DD},
+    {0170000, 0040000,  "bic",      do_bic,     HAS_SS | HAS_DD},
+    {0170000, 0140000,  "bicb",     do_bic,     HAS_SS | HAS_DD},
     {0170000, 0150000,  "bisb",     do_bisb,    HAS_SS | HAS_DD},
     {0170000, 0130000,  "bitb",     do_bitb,    HAS_SS | HAS_DD}, 
     {0177400, 0101000,  "bhi",      do_bhi,     HAS_XX}, 
@@ -43,13 +44,41 @@ Command command[] = {   //таблица команд
     {0177777, 0000242,  "clv",      do_clr_fl,  NO_PARAMS},
     {0177777, 0000244,  "clz",      do_clr_fl,  NO_PARAMS},
     {0177777, 0000250,  "cln",      do_clr_fl,  NO_PARAMS},
+    {0170000, 0020000,  "cmp",      do_cmp,     HAS_SS | HAS_DD},
+    {0170000, 0120000,  "cmpb",     do_cmp,     HAS_SS | HAS_DD},
+    {0177700, 0005100,  "com",      do_comb,    HAS_DD},
+    {0177700, 0105100,  "comb",     do_comb,    HAS_DD},
+    {0177700, 0105300,  "decb",     do_decb,    HAS_DD},
+    {0177000, 0071000,  "div",      do_div,     HAS_R | HAS_SS},
     {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
+    {0177700, 0005200,  "inc",      do_inc,     HAS_DD},
+    {0177700, 0105200,  "incb",     do_inc,     HAS_DD},
+    {0177700, 0000100,  "jmp",      do_jmp,     HAS_DD},
     {0177000, 0004000,  "jsr",      do_jsr,     HAS_R | HAS_DD},
     {0170000, 0010000,  "mov",      do_mov,     HAS_SS | HAS_DD},
     {0170000, 0110000,  "movb",     do_mov,     HAS_SS | HAS_DD},
+    {0177000, 0070000,  "mul",      do_mul,     HAS_R | HAS_SS},
+    {0177700, 0105400,  "negb",     do_negb,    HAS_DD},
+    {0177777, 0000240,  "nop",      do_clr_fl,  NO_PARAMS},
+    {0177777, 0000005,  "reset",    do_reset,   NO_PARAMS},
+    {0177700, 0006100,  "rol",      do_rolb,    HAS_DD},
+    {0177700, 0106100,  "rolb",     do_rolb,    HAS_DD},
+    {0177700, 0006000,  "ror",      do_rorb,    HAS_DD},
+    {0177700, 0106000,  "rorb",     do_rorb,    HAS_DD},
     {0177770, 0000200,  "rts",      do_rts,     HAS_N},
+    {0177700, 0105600,  "sbcb",     do_sbcb,    HAS_DD},
+    {0177777, 0000277,  "scc",      do_set_fl,  NO_PARAMS},
+    {0177777, 0000261,  "sec",      do_set_fl,  NO_PARAMS},
+    {0177777, 0000270,  "sen",      do_set_fl,  NO_PARAMS},
+    {0177777, 0000262,  "sev",      do_set_fl,  NO_PARAMS},
+    {0177777, 0000264,  "sez",      do_set_fl,  NO_PARAMS},
     {0177000, 0077000,  "sob",      do_sob,     HAS_R | HAS_NN},
-    {0177700, 0105700,  "tstb",     do_tstb,    HAS_DD}, 
+    {0170000, 0160000,  "sub",      do_sub,     HAS_SS | HAS_DD},
+    {0177700, 0000300,  "swab",     do_swab,    HAS_DD},
+    {0177700, 0006700,  "sxt",      do_sxt,     HAS_DD},
+    {0177700, 0005700,  "tst",      do_tst,     HAS_DD},
+    {0177700, 0105700,  "tstb",     do_tst,     HAS_DD},
+    {0177000, 0074000,  "xor",      do_xor,     HAS_R | HAS_DD}
 };
 
 #define COMMAND_COUNT (sizeof(command) / sizeof(command[0]))
@@ -171,9 +200,13 @@ void run(void) {
         }
 
         //печатаем лог в стиле MACRO-11
-        if (strcmp(cmd.name, "halt") == 0 || strcmp(cmd.name, "ccc") == 0 ||
-            strcmp(cmd.name, "clc") == 0  || strcmp(cmd.name, "clv") == 0 ||
-            strcmp(cmd.name, "clz") == 0  || strcmp(cmd.name, "cln") == 0) {
+        if (strcmp(cmd.name, "halt") == 0 || strcmp(cmd.name, "ccc") == 0   ||
+            strcmp(cmd.name, "clc") == 0  || strcmp(cmd.name, "clv") == 0   ||
+            strcmp(cmd.name, "clz") == 0  || strcmp(cmd.name, "cln") == 0   ||
+            strcmp(cmd.name, "nop") == 0  || strcmp(cmd.name, "reset") == 0 ||
+            strcmp(cmd.name, "scc") == 0  || strcmp(cmd.name, "sec") == 0   ||
+            strcmp(cmd.name, "sev") == 0  || strcmp(cmd.name, "sez") == 0   ||
+            strcmp(cmd.name, "sen") == 0) {
             print_log(LOG_TRACE, "%06o %06o: %s", current_pc, w, cmd.name);
         } else if (strcmp(cmd.name, "br") == 0 || strcmp(cmd.name, "bpl") == 0  || 
                  strcmp(cmd.name, "bne") == 0  || strcmp(cmd.name, "beq") == 0  ||
@@ -189,9 +222,16 @@ void run(void) {
             Address target_pc = PC - 2 * nn; 
             print_log(LOG_TRACE, "%06o %06o: %s R%d, %06o", current_pc, w, cmd.name, r, target_pc);
         } else if (strcmp(cmd.name, "clr") == 0  || strcmp(cmd.name, "tstb") == 0 ||
-                   strcmp(cmd.name, "adcb") == 0 || strcmp(cmd.name, "adc") == 0  ||
-                   strcmp(cmd.name, "aslb") == 0 || strcmp(cmd.name, "asrb") == 0 ||
-                   strcmp(cmd.name, "asl") == 0  || strcmp(cmd.name, "asr") == 0) {
+                   strcmp(cmd.name, "tst") == 0  || strcmp(cmd.name, "adcb") == 0 ||
+                   strcmp(cmd.name, "adc") == 0  || strcmp(cmd.name, "aslb") == 0 || 
+                   strcmp(cmd.name, "asrb") == 0 || strcmp(cmd.name, "asl") == 0  || 
+                   strcmp(cmd.name, "asr") == 0  || strcmp(cmd.name, "comb") == 0 || 
+                   strcmp(cmd.name, "com") == 0  || strcmp(cmd.name, "decb") == 0 ||
+                   strcmp(cmd.name, "inc") == 0  || strcmp(cmd.name, "incb") == 0 || 
+                   strcmp(cmd.name, "jmp") == 0  || strcmp(cmd.name, "negb") == 0 || 
+                   strcmp(cmd.name, "rolb") == 0 || strcmp(cmd.name, "rorb") == 0 || 
+                   strcmp(cmd.name, "sbcb") == 0 || strcmp(cmd.name, "swab") == 0 || 
+                   strcmp(cmd.name, "sxt") == 0) {
             char dd_str[32] = "";
             format_arg(dd, w, dd_str);
             print_log(LOG_TRACE, "%06o %06o: %s %s", current_pc, w, cmd.name, dd_str);
@@ -205,18 +245,23 @@ void run(void) {
             }
         } else if (strcmp(cmd.name, "rts") == 0) {
             if (n == 7) {
-                print_log(LOG_TRACE, "%06o %06o: %s PC", current_pc, w, cmd.name);
+                print_log(LOG_TRACE, "%06o %06o: return", current_pc, w);
             } else {
-                print_log(LOG_TRACE, "%06o %06o: %s R%d", current_pc, w, cmd.name, n);
+                print_log(LOG_TRACE, "%06o %06o: rts R%d", current_pc, w, n);
             }
         } else if (strcmp(cmd.name, "ash") == 0) {
             char ss_str[32] = "";
-            format_arg(ss, w, ss_str); // Извлекаем аргумент источника (счетчик сдвига)
+            format_arg(ss, w, ss_str);
             print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, ss_str, r);
-        } else if (strcmp(cmd.name, "ashc") == 0) {
+        } else if (strcmp(cmd.name, "ashc") == 0 || strcmp(cmd.name, "mul") == 0 || 
+                   strcmp(cmd.name, "div") == 0) {
             char ss_str[32] = "";
             format_arg(ss, w, ss_str);
             print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, ss_str, r);
+        } else if (strcmp(cmd.name, "xor") == 0) {
+            char dd_str[32] = "";
+            format_arg(dd, w, dd_str);
+            print_log(LOG_TRACE, "%06o %06o: %s R%d, %s", current_pc, w, cmd.name, r, dd_str);
         } else {
             char ss_str[32] = "";
             char dd_str[32] = "";
@@ -546,11 +591,22 @@ void do_beq(void) {
         do_br();
 }
 
-void do_tstb(void) {
-    Byte b = (Byte)(dd.val & 0xFF);
-    //флаги N и Z только по аргументу DD
-    flag_Z = (b == 0) ? 1 : 0;
-    flag_N = (b >> 7) & 1;
+void do_tst(void) {
+    if (byte_cmd) {
+        //TSTb
+        Byte val = (Byte)(dd.val & 0377);
+
+        flag_Z = (val == 0) ? 1 : 0;
+        flag_N = (val >> 07) & 01;
+    } 
+    else {
+        //TST
+        Word val = dd.val;
+
+        flag_Z = (val == 0) ? 1 : 0;
+        flag_N = (val >> 017) & 01;
+    }
+
     flag_V = 0;
     flag_C = 0;
 }
@@ -696,24 +752,35 @@ void do_asr(void) {
     flag_V = flag_N ^ flag_C;
 }
 
-void do_bicb(void) {
-    Byte s = (Byte)(ss.val & 0xFF);
-    Byte d = (Byte)(dd.val & 0xFF);
-    
-    // Сбрасываем биты: d AND (NOT s)
-    Byte res = (Byte)(d & (~s));
+void do_bic(void) {
+    if (byte_cmd) {
+        //BICb
+        Byte s = (Byte)(ss.val & 0377);
+        Byte d = (Byte)(dd.val & 0377);
+        Byte res = (Byte)(d & (~s) & 0377);
 
-    if (dd.space == REGSPACE) {
-        reg[dd.adr] = (signed char)res; // Знаковое расширение до слова в регистре
-    } else {
-        b_write(dd.adr, res);
+        if (dd.space == REGSPACE) {
+            reg[dd.adr] = (signed char)res;
+        } else {
+            b_write(dd.adr, res);
+        }
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 07) & 01;
+    } 
+    else {
+        //BIC
+        Word s = ss.val;
+        Word d = dd.val;
+        Word res = (Word)(d & (~s) & 0177777);
+
+        w_write(dd.adr, res, dd.space);
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 015) & 01;
     }
 
-    // Выставляем флаги условий PSW
-    flag_Z = (res == 0) ? 1 : 0;
-    flag_N = (res >> 7) & 1;
-    flag_V = 0; // По спецификации всегда 0
-    // flag_C не изменяется!
+    flag_V = 0;
 }
 
 void do_bisb(void) {
@@ -758,6 +825,336 @@ void do_clr_fl(void) {
     if (mask & 02)   flag_V = 0;
     if (mask & 04)   flag_Z = 0;
     if (mask & 010)  flag_N = 0;
+}
+
+void do_cmp(void) {
+if (byte_cmd) {
+        //CMPb
+        Byte s = (Byte)(ss.val & 0377);
+        Byte d = (Byte)(dd.val & 0377);
+
+        unsigned int res32 = (unsigned int)s - (unsigned int)d;
+        Byte final_res = (Byte)(res32 & 0377);
+
+        flag_Z = (final_res == 0) ? 1 : 0;
+        flag_N = (final_res >> 07) & 01;
+        flag_C = (s < d) ? 1 : 0;
+        flag_V = (((s >> 07) != (d >> 07)) && ((final_res >> 07) == (d >> 07))) ? 1 : 0;
+    } 
+    else {
+        //CMP
+        Word s = ss.val;
+        Word d = dd.val;
+
+        unsigned int res32 = (unsigned int)s - (unsigned int)d;
+        Word final_res = (Word)(res32 & 0177777);
+
+        flag_Z = (final_res == 0) ? 1 : 0;
+        flag_N = (res32 >> 017) & 01;
+        flag_C = (s < d) ? 1 : 0;
+        flag_V = (((s >> 017) != (d >> 017)) && ((final_res >> 017) == (d >> 017))) ? 1 : 0;
+    }
+}
+
+void do_comb(void) {
+    if (byte_cmd) {
+        //COMb
+        Byte old_val = (Byte)(dd.val & 0377);
+        Byte res = (Byte)(~old_val & 0377);
+
+        if (dd.space == REGSPACE) {
+            reg[dd.adr] = (signed char)res;
+        } else {
+            b_write(dd.adr, res);
+        }
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 07) & 01;
+    } 
+    else {
+        //COM
+        Word old_val = dd.val;
+        Word res = (Word)(~old_val & 0177777);
+
+        w_write(dd.adr, res, dd.space);
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 015) & 01;
+    }
+
+    flag_V = 0;
+    flag_C = 1;
+}
+
+void do_decb(void) {
+    Byte old_val = (Byte)(dd.val & 0377); 
+    Byte res = (Byte)((old_val - 1) & 0377);
+
+    if (dd.space == REGSPACE) {
+        reg[dd.adr] = (signed char)res; 
+    } else {
+        b_write(dd.adr, res);
+    }
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 07) & 1;
+    flag_V = (old_val == 0200) ? 1 : 0;
+}
+
+void do_inc(void) {
+    if (byte_cmd) {
+        //INCb
+        Byte old_val = (Byte)(dd.val & 0377); 
+        Byte res = (Byte)((old_val + 1) & 0377);
+
+        if (dd.space == REGSPACE) {
+            reg[dd.adr] = (signed char)res; 
+        } else {
+            b_write(dd.adr, res);
+        }
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 07) & 01;
+        flag_V = (old_val == 0177) ? 1 : 0;
+    } 
+    else {
+        //INC
+        Word old_val = dd.val;
+        Word res = (Word)((old_val + 1) & 0177777);
+
+        w_write(dd.adr, res, dd.space);
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 015) & 01;
+        flag_V = (old_val == 0077777) ? 1 : 0;
+    }
+}
+
+void do_jmp(void) {
+    //мода 0 (прямая адресация регистра) для JMP запрещена
+    if (dd.space == REGSPACE) {
+        print_log(LOG_ERROR, "HALT: Illegal JMP instruction using Register Mode 0 at address %06o", PC - 2);
+        do_halt();
+        return;
+    }
+
+    PC = dd.adr;
+}
+
+void do_negb(void) {
+    Byte old_val = (Byte)(dd.val & 0377); 
+    Byte res = (Byte)((0 - old_val) & 0377);
+
+    if (dd.space == REGSPACE) {
+        reg[dd.adr] = (signed char)res; 
+    } else {
+        b_write(dd.adr, res);
+    }
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 07) & 1;
+    flag_V = (old_val == 0200) ? 1 : 0;
+    flag_C = (res != 0) ? 1 : 0;
+}
+
+void do_reset(void) {
+    // В рамках текущего MMIO эмулятора команда сброса шины является безопасным
+    // холостым ходом для CPU. Регистры общего назначения и флаги PSW не изменяются.
+    // Если в будущем добавится сложная асинхронная периферия, здесь будет сброс их буферов.
+}
+
+void do_rolb(void) {
+    int old_c = flag_C;
+
+    if (byte_cmd) {
+        //ROLb
+        Byte old_val = (Byte)(dd.val & 0377);
+        flag_C = (old_val >> 07) & 01;
+        Byte res = (Byte)(((old_val << 1) | old_c) & 0377);
+
+        if (dd.space == REGSPACE) reg[dd.adr] = (signed char)res;
+        else b_write(dd.adr, res);
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 07) & 01;
+        flag_V = flag_N ^ flag_C;
+    } 
+    else {
+        //ROL
+        Word old_val = dd.val;
+        flag_C = (old_val >> 015) & 01;
+        Word res = (Word)(((old_val << 1) | old_c) & 0177777);
+
+        w_write(dd.adr, res, dd.space);
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 015) & 01;
+        flag_V = flag_N ^ flag_C;
+    }
+}
+
+void do_rorb(void) {
+    int old_c = flag_C;
+
+    if (byte_cmd) {
+        //RORb
+        Byte old_val = (Byte)(dd.val & 0377);
+        flag_C = old_val & 01;
+        Byte res = (Byte)(((old_val >> 1) | (old_c << 07)) & 0377);
+
+        if (dd.space == REGSPACE) reg[dd.adr] = (signed char)res;
+        else b_write(dd.adr, res);
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 07) & 01;
+        flag_V = flag_N ^ flag_C;
+    } 
+    else {
+        //ROR
+        Word old_val = dd.val;
+        flag_C = old_val & 01;
+        Word res = (Word)(((old_val >> 1) | (old_c << 015)) & 0177777);
+
+        w_write(dd.adr, res, dd.space);
+
+        flag_Z = (res == 0) ? 1 : 0;
+        flag_N = (res >> 015) & 01;
+        flag_V = flag_N ^ flag_C;
+    }
+}
+
+void do_sbcb(void) {
+    int old_c = flag_C;
+
+    Byte old_val = (Byte)(dd.val & 0377);
+    Byte res = (Byte)((old_val - old_c) & 0377);
+
+    if (dd.space == REGSPACE) {
+        reg[dd.adr] = (signed char)res; 
+    } else {
+        b_write(dd.adr, res);
+    }
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 07) & 01;
+    flag_V = (old_val == 0200 && old_c == 1) ? 1 : 0;
+    flag_C = (old_val == 000 && old_c == 1) ? 1 : 0;
+}
+
+void do_set_fl(void) {
+    Word w = w_read(PC - 2);
+    int mask = w & 017;
+
+    if (mask & 01)  flag_C = 1;
+    if (mask & 02)  flag_V = 1;
+    if (mask & 04)  flag_Z = 1;
+    if (mask & 010) flag_N = 1;
+}
+
+void do_sub(void) {
+    Word s = ss.val;
+    Word d = dd.val;
+
+    unsigned int res32 = (unsigned int)d - (unsigned int)s;
+    Word final_res = (Word)(res32 & 0177777);
+
+    w_write(dd.adr, final_res, dd.space);
+
+    flag_Z = (final_res == 0) ? 1 : 0;
+    flag_N = (final_res >> 015) & 01;
+    flag_C = (d < s) ? 1 : 0; 
+    flag_V = (((d >> 015) != (s >> 015)) && ((final_res >> 015) == (s >> 015))) ? 1 : 0;
+}
+
+void do_swab(void) {
+    Word old_val = dd.val;
+    Word low_byte = old_val & 0377;
+    Word high_byte = (old_val >> 010) & 0377;
+    Word res = (low_byte << 010) | high_byte;
+
+    w_write(dd.adr, res, dd.space);
+
+    flag_Z = (high_byte == 0) ? 1 : 0;
+    flag_N = (high_byte >> 07) & 01;
+    flag_V = 0;
+    flag_C = 0;
+}
+
+void do_sxt(void) {
+    Word res = 0000000;
+
+    if (flag_N) {
+        res = 0177777;
+    } else {
+        res = 0000000;
+    }
+
+    w_write(dd.adr, res, dd.space);
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 015) & 01;
+    flag_V = 0;
+}
+
+void do_xor(void) {
+    Word s = reg[r];
+    Word d = dd.val;
+
+    Word res = (Word)((s ^ d) & 0177777);
+
+    w_write(dd.adr, res, dd.space);
+
+    flag_Z = (res == 0) ? 1 : 0;
+    flag_N = (res >> 015) & 01;
+    flag_V = 0;
+}
+void do_mul(void) {
+    short s = (short)ss.val;
+    short r_val = (short)reg[r];
+    int res32 = (int)s * (int)r_val;
+
+    int r_high = r;
+    int r_low = r | 01;
+
+    reg[r_high] = (Word)((res32 >> 016) & 0177777);
+    reg[r_low] = (Word)(res32 & 0177777);
+
+    flag_Z = (res32 == 0) ? 1 : 0;
+    flag_N = (res32 < 0) ? 1 : 0;
+    flag_V = 0;
+    flag_C = (res32 < -32768 || res32 > 32767) ? 1 : 0;
+}
+
+void do_div(void) {
+    short divisor = (short)ss.val;
+
+    //проверка деления на ноль
+    if (divisor == 0) {
+        flag_V = 1;
+        flag_C = 1;
+        return;
+    }
+
+    int r_high = r;
+    int r_low = r | 01;
+
+    int dividend = ((int)reg[r_high] << 016) | (reg[r_low] & 0177777);
+    int quotient = dividend / divisor;
+    int remainder = dividend % divisor;
+
+    //проверка на знаковое переполнение
+    if (quotient < -32768 || quotient > 32767) {
+        flag_V = 1;
+        return;
+    }
+
+    reg[r_high] = (Word)(quotient & 0177777);
+    reg[r_low] = (Word)(remainder & 0177777);
+
+    flag_Z = (quotient == 0) ? 1 : 0;
+    flag_N = (quotient < 0) ? 1 : 0;
+    flag_V = 0;
+    flag_C = 0;
 }
 
 void do_nothing(void) {

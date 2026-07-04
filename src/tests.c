@@ -40,7 +40,7 @@ typedef enum {
     TEST_BR_FORWARD     = 24,
     TEST_BR_BACKWARD    = 25,
     TEST_BRANCHES       = 26,
-    TEST_TSTB           = 27,
+    TEST_TST            = 27,
     TEST_JSR_RTS        = 28,
     TEST_ASH            = 29,
     TEST_ADCB           = 30,
@@ -50,7 +50,25 @@ typedef enum {
     TEST_ASR            = 34,
     TEST_ASRB           = 35,
     TEST_BIT_LOGIC      = 36,
-    TEST_CLR_FL         = 37
+    TEST_CLR_FL         = 37,
+    TEST_CMPB           = 38,
+    TEST_COMB           = 39,
+    TEST_DECB           = 40,
+    TEST_INC            = 41,
+    TEST_JMP            = 42,
+    TEST_NEGB           = 43,
+    TEST_NOP            = 44,
+    TEST_RESET          = 45,
+    TEST_ROLB           = 46,
+    TEST_RORB           = 47,
+    TEST_SBCB           = 48,
+    TEST_SET_FL         = 49,
+    TEST_SUB            = 50,
+    TEST_SWAB           = 51,
+    TEST_SXT            = 52,
+    TEST_XOR            = 53,
+    TEST_MUL            = 54,
+    TEST_DIV            = 55
 } TestID;
 
 typedef struct {
@@ -86,7 +104,7 @@ static const TestCase test_table[] = {
     {TEST_BR_FORWARD,       "test_br_forward",          test_br_forward},
     {TEST_BR_BACKWARD,      "test_br_backward",         test_br_backward},
     {TEST_BRANCHES,         "test_branches",            test_branches},
-    {TEST_TSTB,             "test_tstb",                test_tstb},
+    {TEST_TST,              "test_tst",                 test_tst},
     {TEST_JSR_RTS,          "test_jsr_rts",             test_jsr_rts},
     {TEST_ASH,              "test_ash",                 test_ash},
     {TEST_ADCB,             "test_adcb",                test_adcb},
@@ -96,7 +114,25 @@ static const TestCase test_table[] = {
     {TEST_ASR,              "test_asr",                 test_asr},
     {TEST_ASRB,             "test_asrb",                test_asrb},
     {TEST_BIT_LOGIC,        "test_bit_logic_bytes",     test_bit_logic_bytes},
-    {TEST_CLR_FL,           "test_clr_fl",              test_clear_flags}
+    {TEST_CLR_FL,           "test_clr_fl",              test_clear_flags},
+    {TEST_CMPB,             "test_cmpb",                test_cmpb},
+    {TEST_COMB,             "test_comb",                test_comb},
+    {TEST_DECB,             "test_decb",                test_decb},
+    {TEST_INC,              "test_inc",                 test_inc},
+    {TEST_JMP,              "test_jmp",                 test_jmp},
+    {TEST_NEGB,             "test_negb",                test_negb},
+    {TEST_NOP,              "test_nop",                 test_nop},
+    {TEST_RESET,            "test_reset",               test_reset},
+    {TEST_ROLB,             "test_rolb",                test_rolb},
+    {TEST_RORB,             "test_rorb",                test_rorb},
+    {TEST_SBCB,             "test_sbcb",                test_sbcb},
+    {TEST_SET_FL,           "test_set_fl",              test_set_flags},
+    {TEST_SUB,              "test_sub",                 test_sub},
+    {TEST_SWAB,             "test_swab",                test_swab},
+    {TEST_SXT,              "test_sxt",                 test_sxt},
+    {TEST_XOR,              "test_xor",                 test_xor},
+    {TEST_MUL,              "test_mul",                 test_mul},
+    {TEST_DIV,              "test_div",                 test_div},
 
 };
 
@@ -150,7 +186,7 @@ void run_test_by_id(int id) {
         case TEST_BR_FORWARD    :   test_br_forward();              break;
         case TEST_BR_BACKWARD   :   test_br_backward();             break;
         case TEST_BRANCHES      :   test_branches();                break;
-        case TEST_TSTB          :   test_tstb();                    break;
+        case TEST_TST           :   test_tst();                     break;
         case TEST_JSR_RTS       :   test_jsr_rts();                 break;
         case TEST_ASH           :   test_ash();                     break;
         case TEST_ADCB          :   test_adcb();                    break;
@@ -161,6 +197,24 @@ void run_test_by_id(int id) {
         case TEST_ASRB          :   test_asrb();                    break;
         case TEST_BIT_LOGIC     :   test_bit_logic_bytes();         break;
         case TEST_CLR_FL        :   test_clear_flags();             break;
+        case TEST_CMPB          :   test_cmpb();                    break;
+        case TEST_COMB          :   test_comb();                    break;
+        case TEST_DECB          :   test_decb();                    break;
+        case TEST_INC           :   test_inc();                     break;
+        case TEST_JMP           :   test_jmp();                     break;
+        case TEST_NEGB          :   test_negb();                    break;
+        case TEST_NOP           :   test_nop();                     break;
+        case TEST_RESET         :   test_reset();                   break;
+        case TEST_ROLB          :   test_rolb();                    break;
+        case TEST_RORB          :   test_rorb();                    break;
+        case TEST_SBCB          :   test_sbcb();                    break;
+        case TEST_SET_FL        :   test_set_flags();               break;
+        case TEST_SUB           :   test_sub();                     break;
+        case TEST_SWAB          :   test_swab();                    break;
+        case TEST_SXT           :   test_sxt();                     break;
+        case TEST_XOR           :   test_xor();                     break;
+        case TEST_MUL           :   test_mul();                     break;
+        case TEST_DIV           :   test_div();                     break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -984,42 +1038,35 @@ void test_bne(void) {
 }
 
 //тест на выставление отрицательного байта N в TSTb
-void test_tstb(void) {
+void test_tst(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
-    
-    //setup N = 1
-    flag_N = 0; flag_Z = 1; flag_V = 1; flag_C = 1;
-    
-    reg[4] = 0177775; 
 
-    Command cmd = parse_cmd(0105704);
-    
-    assert(strcmp(cmd.name, "tstb") == 0);
+    //setup TST
+    byte_cmd = 0;
+    flag_C = 1; flag_V = 1;
+    dd.val = 0100000;
+    dd.adr = 1; dd.space = REGSPACE;
 
-    cmd.do_command();
-
+    do_tst();
     assert(flag_N == 1);
     assert(flag_Z == 0);
     assert(flag_V == 0);
     assert(flag_C == 0);
 
-    //setup N = 0
-    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 1;
-    reg[4] = 0;
+    //setup TSTb
+    byte_cmd = 1;
+    flag_N = 1;
+    dd.val = 0;
+    dd.adr = 1; dd.space = REGSPACE;
 
-    cmd = parse_cmd(0105704);
-
-    cmd.do_command();
-
+    do_tst();
     assert(flag_Z == 1);
     assert(flag_N == 0);
-    assert(flag_V == 0);
-    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
 
-    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на вызов подпрограмм JSR/RTS по регистру R2
@@ -1431,7 +1478,7 @@ void test_bit_logic_bytes(void) {
     dd.adr = 1; 
     dd.space = REGSPACE;
     
-    do_bicb();
+    do_bic();
 
     assert((reg[1] & 0xFF) == 0120);
     assert(flag_C == 1);
@@ -1532,6 +1579,625 @@ void test_clear_flags(void) {
     assert(flag_V == 0);
     assert(flag_Z == 0);
     assert(flag_N == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+
+//тест на работу команды сравнения байт CMPb
+void test_cmpb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup на равные байты
+    reg[2] = 055;
+    ss.val = 055;
+    dd.val = 055; 
+    dd.adr = 2; 
+    dd.space = REGSPACE;
+
+    do_cmp();
+
+    assert(reg[2] == 055);
+    assert(flag_Z == 1);
+    assert(flag_N == 0);
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //setup в SS меньшее в DD большее
+    reg[2] = 020;
+    ss.val = 010;
+    dd.val = 020; 
+    dd.adr = 2; 
+    dd.space = REGSPACE;
+
+    do_cmp();
+
+    assert(reg[2] == 020);
+    assert(flag_Z == 0);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+//тест на работу команды байтовой инверсии COMb
+void test_comb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[3] = 0125; 
+    byte_cmd = 1;
+    flag_C = 0;
+    flag_V = 1;
+    dd.val = 0125;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_comb();
+
+    assert((reg[3] & 0xFF) == 0252); 
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_V == 0);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды декремента DECb
+void test_decb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[4] = 0200;
+    byte_cmd = 1;
+    flag_C = 1;
+    dd.val = 0200;
+    dd.adr = 4;
+    dd.space = REGSPACE;
+
+    do_decb();
+
+    assert((reg[4] & 0377) == 0177); 
+    assert(flag_V == 1);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды инкремента INCb
+void test_inc(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[4] = 0177;
+    byte_cmd = 1;
+    flag_C = 1;
+    dd.val = 0177;
+    dd.adr = 4;
+    dd.space = REGSPACE;
+
+    do_inc();
+
+    assert((reg[4] & 0377) == 0200);
+    assert(flag_V == 1);
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды безусловного перехода JMP
+void test_jmp(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    PC = 01000;
+    reg[2] = 004000;
+    dd.adr = 004000;
+    dd.val = 0;
+    dd.space = MEMSPACE;
+
+    do_jmp();
+
+    assert(PC == 004000);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды смены знака NEGb
+void test_negb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup положительное число
+    reg[3] = 004; 
+    byte_cmd = 1;
+    flag_C = 0;
+    dd.val = 004;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_negb();
+
+    assert(reg[3] == 0177774); 
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_C == 1);
+    assert(flag_V == 0);
+
+    //setup ноль
+    reg[3] = 0; 
+    byte_cmd = 1;
+    flag_C = 1;
+    dd.val = 0;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_negb();
+
+    assert(reg[3] == 0); 
+    assert(flag_Z == 1);
+    assert(flag_N == 0); 
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу пустой команды NOP
+void test_nop(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    PC = 01002;
+    reg[1] = 42;
+    flag_N = 1; 
+    flag_C = 1; 
+    flag_Z = 0; 
+    flag_V = 0;
+    w_write(01000, 0000240, MEMSPACE);
+
+    do_clr_fl();
+
+    assert(reg[1] == 42);
+    assert(flag_N == 1);
+    assert(flag_C == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу сброса командой RESET
+void test_reset(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    PC = 01002;
+    reg[5] = 77;
+    flag_Z = 1; 
+    flag_V = 1; 
+    flag_N = 0; 
+    flag_C = 0;
+
+    do_reset();
+
+    assert(reg[5] == 77);
+    assert(flag_Z == 1);
+    assert(flag_V == 1);
+    assert(flag_N == 0);
+    assert(flag_C == 0);
+
+    //clear
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу циклического сдвига влево командой ROLb
+void test_rolb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[3] = 0200;
+    byte_cmd = 1;
+    flag_C = 0;
+    dd.val = 0200; 
+    dd.adr = 3; 
+    dd.space = REGSPACE;
+
+    do_rolb();
+
+    assert((reg[3] & 0377) == 0);
+    assert(flag_Z == 1);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу циклического сдвига вправо командой ROLb
+void test_rorb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[3] = 001;
+    byte_cmd = 1;
+    flag_C = 1;
+
+    dd.val = 001; 
+    dd.adr = 3; 
+    dd.space = REGSPACE;
+
+    do_rorb();
+
+    assert((reg[3] & 0377) == 0200);
+    assert(flag_C == 1);
+    assert(flag_N == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команды байтового вычитания переноса SBCb
+void test_sbcb(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup обычного вычитания переноса
+    reg[3] = 005;
+    byte_cmd = 1;
+    flag_C = 1;
+    dd.val = 005;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_sbcb();
+
+    assert(reg[3] == 004); 
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //setup вычитания из нуля
+    reg[3] = 000;
+    byte_cmd = 1;
+    flag_C = 1;
+    dd.val = 000;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_sbcb();
+
+    assert(reg[3] == 0177777); 
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_C == 1);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу команд установки флагов
+void test_set_flags(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup for all
+    PC = 01002; 
+
+    //setup SEC
+    flag_C = 0; 
+    flag_V = 0; 
+    flag_Z = 0; 
+    flag_N = 0;
+    w_write(01000, 0000261, MEMSPACE);
+
+    do_set_fl();
+
+    assert(flag_C == 1);
+    assert(flag_V == 0); 
+    assert(flag_Z == 0); 
+    assert(flag_N == 0);
+
+    //setup SEV
+    flag_C = 0; 
+    flag_V = 0; 
+    flag_Z = 0; 
+    flag_N = 0;
+    w_write(01000, 0000262, MEMSPACE);
+
+    do_set_fl();
+
+    assert(flag_V == 1);
+    assert(flag_C == 0); 
+    assert(flag_Z == 0); 
+    assert(flag_N == 0);
+
+    //setup SEZ
+    flag_C = 0; 
+    flag_V = 0; 
+    flag_Z = 0; 
+    flag_N = 0;
+    w_write(01000, 0000264, MEMSPACE);
+
+    do_set_fl();
+
+    assert(flag_Z == 1);
+    assert(flag_C == 0); 
+    assert(flag_V == 0); 
+    assert(flag_N == 0);
+
+    //setup SEN
+    flag_C = 0; 
+    flag_V = 0; 
+    flag_Z = 0; 
+    flag_N = 0;
+    w_write(01000, 0000270, MEMSPACE);
+
+    do_set_fl();
+
+    assert(flag_N == 1);
+    assert(flag_C == 0); 
+    assert(flag_V == 0); 
+    assert(flag_Z == 0);
+
+    //setup SCC
+    flag_C = 0; 
+    flag_V = 0; 
+    flag_Z = 0; 
+    flag_N = 0;
+    w_write(01000, 0000277, MEMSPACE);
+
+    do_set_fl();
+
+    assert(flag_C == 1);
+    assert(flag_V == 1);
+    assert(flag_Z == 1);
+    assert(flag_N == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на вычитание командой SUB
+void test_sub(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup обычное вычитание
+    reg[2] = 12;
+    byte_cmd = 0;
+    flag_C = 0;
+    ss.val = 5;
+    dd.val = 12; 
+    dd.adr = 2; 
+    dd.space = REGSPACE;
+
+    do_sub();
+
+    assert(reg[2] == 7); 
+    assert(flag_Z == 0); 
+    assert(flag_N == 0);
+    assert(flag_C == 0); 
+    assert(flag_V == 0);
+
+    //setup из меньшего большее
+    reg[2] = 5;
+    byte_cmd = 0;
+    flag_C = 0;
+    ss.val = 15;
+    dd.val = 5; 
+    dd.adr = 2; 
+    dd.space = REGSPACE;
+
+    do_sub();
+
+    assert(reg[2] == 0177766);
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_C == 1);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на перестановку байт командой SWAb
+void test_swab(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    Word test_val = 012345;
+    Word expected_low = test_val & 0xFF;
+    Word expected_high = (test_val >> 8) & 0xFF;
+    Word expected_res = (expected_low << 8) | expected_high;
+
+    reg[2] = test_val; 
+    byte_cmd = 0;
+    flag_C = 1; 
+    flag_V = 1;
+    dd.val = test_val;
+    dd.adr = 2;
+    dd.space = REGSPACE;
+
+    do_swab();
+
+    assert(reg[2] == expected_res);
+    assert(flag_Z == (expected_high == 0 ? 1 : 0));
+    assert(flag_N == ((expected_high >> 7) & 1));
+    assert(flag_V == 0); 
+    assert(flag_C == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на знаковое расширение флага N командой SXT
+void test_sxt(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup N = 1
+    reg[2] = 0012345;
+    byte_cmd = 0;
+    flag_N = 1;
+    flag_C = 1;
+    dd.val = 0;
+    dd.adr = 2;
+    dd.space = REGSPACE;
+
+    do_sxt();
+
+    assert(reg[2] == 0177777);
+    assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_C == 1);
+
+    //setup N = 0
+    reg[2] = 0012345;
+    byte_cmd = 0;
+    flag_N = 0;
+    flag_C = 1;
+    dd.val = 0;
+    dd.adr = 2;
+    dd.space = REGSPACE;
+
+    do_sxt();
+
+    assert(reg[2] == 0000000);
+    assert(flag_N == 0);
+    assert(flag_Z == 1);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на исключающее ИЛИ командой XOR
+void test_xor(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[2] = 0012345; 
+    reg[3] = 0005252;
+    byte_cmd = 0;
+    r = 2;
+    flag_C = 1;
+    dd.val = 0005252;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_xor();
+
+    assert(reg[3] == 0017117);
+    assert(flag_Z == 0); 
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 1);
+
+    //setup XOR одинаковых чисел
+    reg[2] = 0012345;
+    byte_cmd = 0;
+    r = 2;
+    flag_C = 1;
+    dd.val = 0012345;
+    dd.adr = 2;
+    dd.space = REGSPACE;
+
+    do_xor();
+
+    assert(reg[2] == 0000000);
+    assert(flag_Z == 1);
+    assert(flag_N == 0);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на умножение командой MUL
+void test_mul(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup
+    reg[2] = 0000200;
+    r = 2;
+    ss.val = 5;
+
+    do_mul();
+
+    assert(reg[2] == 0000000);
+    assert(reg[3] == 0001200);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_C == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на деление командой DIV
+void test_div(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    reg[2] = 0000000;
+    reg[3] = 0020005;
+    r = 2;
+    ss.val = 2;
+
+    do_div();
+
+    assert(reg[2] == 0010002);
+    assert(reg[3] == 0000001);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();

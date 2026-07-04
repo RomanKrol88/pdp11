@@ -54,7 +54,7 @@ int main (int argc, char * argv[])  {
     }
 
     print_log(LOG_INFO, "==================================================");
-    print_log(LOG_INFO, "     PDP-11 EMULATOR v0.5 (beta) BY ROMAN KROL    ");
+    print_log(LOG_INFO, "        PDP-11 EMULATOR v1.0 BY ROMAN KROL        ");
     print_log(LOG_INFO, "==================================================");
 
     //load_data(stdin);
