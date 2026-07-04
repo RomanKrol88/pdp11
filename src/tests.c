@@ -39,18 +39,18 @@ typedef enum {
     TEST_BR             = 23,
     TEST_BR_FORWARD     = 24,
     TEST_BR_BACKWARD    = 25,
-    TEST_BEQ            = 26,
-    TEST_BPL            = 27,
-    TEST_BNE            = 28,
-    TEST_TSTB           = 29,
-    TEST_JSR_RTS        = 30,
-    TEST_ASH            = 31,
-    TEST_ADCB           = 32,
-    TEST_ASHC           = 33,
-    TEST_ASL            = 34,
-    TEST_ASLB           = 35,
-    TEST_ASR            = 36,
-    TEST_ASRB           = 37
+    TEST_BRANCHES       = 26,
+    TEST_TSTB           = 27,
+    TEST_JSR_RTS        = 28,
+    TEST_ASH            = 29,
+    TEST_ADCB           = 30,
+    TEST_ASHC           = 31,
+    TEST_ASL            = 32,
+    TEST_ASLB           = 33,
+    TEST_ASR            = 34,
+    TEST_ASRB           = 35,
+    TEST_BIT_LOGIC      = 36,
+    TEST_CLR_FL         = 37
 } TestID;
 
 typedef struct {
@@ -85,18 +85,18 @@ static const TestCase test_table[] = {
     {TEST_BR,               "test_br",                  test_br},
     {TEST_BR_FORWARD,       "test_br_forward",          test_br_forward},
     {TEST_BR_BACKWARD,      "test_br_backward",         test_br_backward},
-    {TEST_BEQ,              "test_beq",                 test_beq},
-    {TEST_BPL,              "test_bpl",                 test_bpl},
-    {TEST_BNE,              "test_bne",                 test_bne},
+    {TEST_BRANCHES,         "test_branches",            test_branches},
     {TEST_TSTB,             "test_tstb",                test_tstb},
     {TEST_JSR_RTS,          "test_jsr_rts",             test_jsr_rts},
     {TEST_ASH,              "test_ash",                 test_ash},
     {TEST_ADCB,             "test_adcb",                test_adcb},
     {TEST_ASHC,             "test_ashc",                test_ashc},
-    {TEST_ASL,               "test_asl",                 test_asl},
+    {TEST_ASL,              "test_asl",                 test_asl},
     {TEST_ASLB,             "test_aslb",                test_aslb},
     {TEST_ASR,              "test_asr",                 test_asr},
-    {TEST_ASRB,             "test_asrb",                test_asrb}
+    {TEST_ASRB,             "test_asrb",                test_asrb},
+    {TEST_BIT_LOGIC,        "test_bit_logic_bytes",     test_bit_logic_bytes},
+    {TEST_CLR_FL,           "test_clr_fl",              test_clear_flags}
 
 };
 
@@ -149,9 +149,7 @@ void run_test_by_id(int id) {
         case TEST_BR            :   test_br();                      break;
         case TEST_BR_FORWARD    :   test_br_forward();              break;
         case TEST_BR_BACKWARD   :   test_br_backward();             break;
-        case TEST_BEQ           :   test_beq();                     break;
-        case TEST_BPL           :   test_bpl();                     break;
-        case TEST_BNE           :   test_bne();                     break;
+        case TEST_BRANCHES      :   test_branches();                break;
         case TEST_TSTB          :   test_tstb();                    break;
         case TEST_JSR_RTS       :   test_jsr_rts();                 break;
         case TEST_ASH           :   test_ash();                     break;
@@ -161,6 +159,8 @@ void run_test_by_id(int id) {
         case TEST_ASLB          :   test_aslb();                    break;
         case TEST_ASR           :   test_asr();                     break;
         case TEST_ASRB          :   test_asrb();                    break;
+        case TEST_BIT_LOGIC     :   test_bit_logic_bytes();         break;
+        case TEST_CLR_FL        :   test_clear_flags();             break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -1229,4 +1229,312 @@ void test_asrb(void) {
     reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+}
+
+//тест (комплексная верификация) работы условных ветвлений
+void test_branches(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup for all
+    xx = 4;
+
+    //setup BCS, BCC, BLO, BHIS
+    PC = 01000; 
+    flag_C = 1;
+
+    do_bcs();
+
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_C = 1;
+
+    do_bcc();
+
+    assert(PC == 01000);
+
+    //setup BMI, BPL, BEQ, BNE
+    PC = 01000; 
+    flag_N = 1;
+
+    do_bmi(); 
+
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_N = 1;
+
+    do_bpl(); 
+    
+    assert(PC == 01000);
+
+    PC = 01000; 
+    flag_Z = 1;
+
+    do_beq(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_Z = 1;
+
+    do_bne(); 
+    
+    assert(PC == 01000);
+
+    //setup BHI, BLOS
+    PC = 01000; 
+    flag_C = 0; 
+    flag_Z = 0;
+
+    do_bhi(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_C = 1; 
+    flag_Z = 0;
+
+    do_bhi(); 
+    
+    assert(PC == 01000);
+
+    PC = 01000; 
+    flag_C = 1; 
+    flag_Z = 0;
+
+    do_blos(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_C = 0; 
+    flag_Z = 1;
+
+    do_blos(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_C = 0; 
+    flag_Z = 0;
+
+    do_blos(); 
+    
+    assert(PC == 01000);
+
+    //setup BGE, BLT, BGT, BLE
+    PC = 01000; 
+    flag_N = 1; 
+    flag_V = 0;
+
+    do_blt(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_N = 1; 
+    flag_V = 1;
+
+    do_bge(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_Z = 0; 
+    flag_N = 1; 
+    flag_V = 1;
+
+    do_bgt(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_Z = 1; 
+    flag_N = 1; 
+    flag_V = 1;
+
+    do_bgt(); 
+    
+    assert(PC == 01000);
+
+    PC = 01000; 
+    flag_Z = 1; 
+    flag_N = 0; 
+    flag_V = 0;
+
+    do_ble(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_Z = 0; 
+    flag_N = 1; 
+    flag_V = 0;
+
+    do_ble(); 
+    
+    assert(PC == 01010);
+
+    //setup BVC, BVS
+
+    PC = 01000; 
+    flag_V = 1;
+
+    do_bvs(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_V = 0;
+
+    do_bvc(); 
+    
+    assert(PC == 01010);
+
+    PC = 01000; 
+    flag_V = 1;
+
+    do_bvc(); 
+    
+    assert(PC == 01000);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на работу байтовых логических команд BICb, BISb, BITb
+void test_bit_logic_bytes(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup for all
+    flag_C = 1;
+
+    //setup BISb
+    reg[1] = 0005;
+    ss.val = 0120;
+    dd.val = 0005; 
+    dd.adr = 1; 
+    dd.space = REGSPACE;
+    
+    do_bisb();
+
+    assert((reg[1] & 0xFF) == 0125);
+    assert(flag_C == 1);
+    assert(flag_Z == 0);
+
+    //setup BICb
+    ss.val = 0005;
+    dd.val = 0125; 
+    dd.adr = 1; 
+    dd.space = REGSPACE;
+    
+    do_bicb();
+
+    assert((reg[1] & 0xFF) == 0120);
+    assert(flag_C == 1);
+    assert(flag_Z == 0);
+
+    //setup BITb
+    ss.val = 0020;
+    dd.val = 0120; 
+    dd.adr = 1; 
+    dd.space = REGSPACE;
+    
+    do_bitb();
+
+    assert((reg[1] & 0xFF) == 0120);
+    assert(flag_Z == 0);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+
+//тест на работу команд очистки флагов CLC, CLV, CLZ, CLN, CCC
+void test_clear_flags(void) {
+    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+
+    //setup for all
+    PC = 01002; 
+
+    //setup CLC
+    flag_C = 1; 
+    flag_V = 1; 
+    flag_Z = 1; 
+    flag_N = 1;
+    w_write(01000, 0000241, MEMSPACE);
+
+    do_clr_fl();
+
+    assert(flag_C == 0);
+    assert(flag_V == 1); 
+    assert(flag_Z == 1); 
+    assert(flag_N == 1);
+
+    //setup CLV
+    flag_C = 1; 
+    flag_V = 1; 
+    flag_Z = 1; 
+    flag_N = 1;
+    w_write(01000, 0000242, MEMSPACE);
+
+    do_clr_fl();
+
+    assert(flag_V == 0);
+    assert(flag_C == 1); 
+    assert(flag_Z == 1); 
+    assert(flag_N == 1);
+
+    //setup CLZ
+    flag_C = 1; 
+    flag_V = 1; 
+    flag_Z = 1; 
+    flag_N = 1;
+    w_write(01000, 0000244, MEMSPACE);
+
+    do_clr_fl();
+
+    assert(flag_Z == 0);
+    assert(flag_C == 1); 
+    assert(flag_V == 1); 
+    assert(flag_N == 1);
+
+    //setup CLN
+    flag_C = 1; 
+    flag_V = 1; 
+    flag_Z = 1; 
+    flag_N = 1;
+    w_write(01000, 0000250, MEMSPACE);
+
+    do_clr_fl();
+
+    assert(flag_N == 0);
+    assert(flag_C == 1); 
+    assert(flag_V == 1); 
+    assert(flag_Z == 1);
+
+    //setup CCC
+    flag_C = 1; 
+    flag_V = 1; 
+    flag_Z = 1; 
+    flag_N = 1;
+    w_write(01000, 0000257, MEMSPACE);
+
+    do_clr_fl();
+
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }

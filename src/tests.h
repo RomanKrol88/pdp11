@@ -17,9 +17,7 @@ void test_clr(void);                        //тест на выполнение
 void test_br(void);                         //тест на безусловный переход BR
 void test_br_forward(void);                 //тест на безусловный переход вперед
 void test_br_backward(void);                //тест на безусловный переход назад
-void test_beq(void);                        //тест на условный переход по флагу нуля (Z = 1)
-void test_bpl(void);                        //тест на условный переход по флагу знака (N = 0)
-void test_bne(void);                        //тест на условный переход по флагу нуля (Z = 0)
+void test_branches(void);                   //тест (комплексная верификация) работы условных ветвлений
 void test_tstb(void);                       //тест на выставление отрицательного байта N в TSTb
 void test_jsr_rts(void);                    //тест на вызов подпрограмм JSR/RTS по регистру R2
 void test_ash(void);                        //тест на проверку сдвига влево и сдвига вправо командой ASH
@@ -29,6 +27,8 @@ void test_asl(void);                        //тест на работу ком�
 void test_aslb(void);                       //тест на работу команды ASLb с байтом
 void test_asr(void);                        //тест на работу команды ASR со словом
 void test_asrb(void);                       //тест на работу команды ASRb с байтом
+void test_bit_logic_bytes(void);            //тест на работу байтовых логических команд BICb, BISb, BITb
+void test_clear_flags(void);                //тест на работу команд очистки флагов CLC, CLV, CLZ, CLN, CCC
 
 
 
