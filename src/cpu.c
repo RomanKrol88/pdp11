@@ -13,8 +13,8 @@ Command command[] = {   //таблица команд
     {0177700, 0005500,  "adc",      do_adcb,    HAS_DD},
     {0177700, 0105500,  "adcb",     do_adcb,    HAS_DD},
     {0170000, 0060000,  "add",      do_add,     HAS_SS | HAS_DD},
-    {0177000, 0072000,  "ash",      do_ash,     HAS_R | HAS_SS},
-    {0177000, 0073000,  "ashc",     do_ashc,    HAS_R | HAS_SS},
+    {0177000, 0072000,  "ash",      do_ash,     HAS_RLEFT | HAS_DD},
+    {0177000, 0073000,  "ashc",     do_ashc,    HAS_RLEFT | HAS_DD},
     {0177700, 0006300,  "asl",      do_asl,     HAS_DD},
     {0177700, 0106300,  "aslb",     do_aslb,    HAS_DD},
     {0177700, 0006200,  "asr",      do_asr,     HAS_DD},
@@ -49,15 +49,15 @@ Command command[] = {   //таблица команд
     {0177700, 0005100,  "com",      do_comb,    HAS_DD},
     {0177700, 0105100,  "comb",     do_comb,    HAS_DD},
     {0177700, 0105300,  "decb",     do_decb,    HAS_DD},
-    {0177000, 0071000,  "div",      do_div,     HAS_R | HAS_SS},
+    {0177000, 0071000,  "div",      do_div,     HAS_RLEFT | HAS_DD},
     {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
     {0177700, 0005200,  "inc",      do_inc,     HAS_DD},
     {0177700, 0105200,  "incb",     do_inc,     HAS_DD},
     {0177700, 0000100,  "jmp",      do_jmp,     HAS_DD},
-    {0177000, 0004000,  "jsr",      do_jsr,     HAS_R | HAS_DD},
+    {0177000, 0004000,  "jsr",      do_jsr,     HAS_RLEFT | HAS_DD},
     {0170000, 0010000,  "mov",      do_mov,     HAS_SS | HAS_DD},
     {0170000, 0110000,  "movb",     do_mov,     HAS_SS | HAS_DD},
-    {0177000, 0070000,  "mul",      do_mul,     HAS_R | HAS_SS},
+    {0177000, 0070000,  "mul",      do_mul,     HAS_RLEFT | HAS_DD},
     {0177700, 0105400,  "negb",     do_negb,    HAS_DD},
     {0177777, 0000240,  "nop",      do_clr_fl,  NO_PARAMS},
     {0177777, 0000005,  "reset",    do_reset,   NO_PARAMS},
@@ -65,26 +65,27 @@ Command command[] = {   //таблица команд
     {0177700, 0106100,  "rolb",     do_rolb,    HAS_DD},
     {0177700, 0006000,  "ror",      do_rorb,    HAS_DD},
     {0177700, 0106000,  "rorb",     do_rorb,    HAS_DD},
-    {0177770, 0000200,  "rts",      do_rts,     HAS_N},
+    {0177770, 0000200,  "rts",      do_rts,     HAS_RRIGHT},
     {0177700, 0105600,  "sbcb",     do_sbcb,    HAS_DD},
     {0177777, 0000277,  "scc",      do_set_fl,  NO_PARAMS},
     {0177777, 0000261,  "sec",      do_set_fl,  NO_PARAMS},
     {0177777, 0000270,  "sen",      do_set_fl,  NO_PARAMS},
     {0177777, 0000262,  "sev",      do_set_fl,  NO_PARAMS},
     {0177777, 0000264,  "sez",      do_set_fl,  NO_PARAMS},
-    {0177000, 0077000,  "sob",      do_sob,     HAS_R | HAS_NN},
+    {0177000, 0077000,  "sob",      do_sob,     HAS_RLEFT | HAS_NN},
     {0170000, 0160000,  "sub",      do_sub,     HAS_SS | HAS_DD},
     {0177700, 0000300,  "swab",     do_swab,    HAS_DD},
     {0177700, 0006700,  "sxt",      do_sxt,     HAS_DD},
     {0177700, 0005700,  "tst",      do_tst,     HAS_DD},
     {0177700, 0105700,  "tstb",     do_tst,     HAS_DD},
-    {0177000, 0074000,  "xor",      do_xor,     HAS_R | HAS_DD}
+    {0177000, 0074000,  "xor",      do_xor,     HAS_RLEFT | HAS_DD},
+    {0000000, 0000000,  "unknown",  do_unknown, NO_PARAMS}
 };
 
 #define COMMAND_COUNT (sizeof(command) / sizeof(command[0]))
 
 Arg ss, dd;                 //переменные аргументов (ss - откуда, dd - куда)
-int r, n, nn, xx;           //переменные (r - номер регистра, n - константа 3 бита, nn  - константа 6 бит, xx - смещение со знаком)
+int r, nn, xx;           //переменные (r - номер регистра, nn  - константа 6 бит, xx - смещение со знаком)
 
 //флаги условий регистра состояния PSW
 int flag_N = 0;             //Negative (результат отрицательный)
@@ -93,8 +94,6 @@ int flag_V = 0;             //oVerflow (Знаковое переполнени�
 int flag_C = 0;             //Carry    (перенос из старшего разряда)
 
 int byte_cmd = 0;           //1 — команда BYTE, 0 — команда WORD (15-й бит)
-
-static const Command unknown_command = {0, 0, "unknown", do_nothing, NO_PARAMS}; //если функция не определена
 
 int output_print = 0;       //переменная для беспрефиксного вывода stdout на дисплей
 
@@ -144,25 +143,20 @@ Command parse_cmd(Word w) {
     for (size_t i = 0; i < COMMAND_COUNT; i++) {
         if ((w & command[i].mask) == command[i].opcode) {   
             //проверка флага SS
-            if ((command[i].params & HAS_R) && (command[i].params & HAS_SS)) {
-                ss = get_mr(w); //забираем из младших 6 бит для ASH/ASHC
-            } else {
-                //обычные двухадресные команды (mov, add), у них SS в битах 6-11
-                if (command[i].params & HAS_SS) {
+            if (command[i].params & HAS_SS) {
                     ss = get_mr(w >> 6);
-                }
             }
             //проверка флага DD
             if (command[i].params & HAS_DD) {
                 dd = get_mr(w);
             }
-            //проверка флага R
-            if (command[i].params & HAS_R) {
+            //проверка флага RLEFT
+            if (command[i].params & HAS_RLEFT) {
                 r = (w >> 6) & 7;
             }
-            //проверка флага N
-            if (command[i].params & HAS_N) {
-                n = w & 7;
+            //проверка флага RRIGHT
+            if (command[i].params & HAS_RRIGHT) {
+                r = w & 7;
             }
             //проверка флага NN
             if (command[i].params & HAS_NN) {
@@ -177,8 +171,7 @@ Command parse_cmd(Word w) {
             return command[i];
         }
     }
-    
-    return unknown_command;
+    return command[COMMAND_COUNT - 1];
 }
 
 void run(void) {
@@ -193,20 +186,15 @@ void run(void) {
         PC += 2;                                        //PC сразу же указывает на следующее неразобранное слово
         Command cmd = parse_cmd(w);                     //декодируем считанное слово
 
-        //если вернулась неизвестная команда, выводим ошибку
-        if (strcmp(cmd.name, "unknown") == 0) {
-            print_log(LOG_ERROR, "Unknown instruction %06o at address %06o", w, PC - 2);
-            exit(1);
-        }
-
         //печатаем лог в стиле MACRO-11
-        if (strcmp(cmd.name, "halt") == 0 || strcmp(cmd.name, "ccc") == 0   ||
-            strcmp(cmd.name, "clc") == 0  || strcmp(cmd.name, "clv") == 0   ||
-            strcmp(cmd.name, "clz") == 0  || strcmp(cmd.name, "cln") == 0   ||
-            strcmp(cmd.name, "nop") == 0  || strcmp(cmd.name, "reset") == 0 ||
-            strcmp(cmd.name, "scc") == 0  || strcmp(cmd.name, "sec") == 0   ||
-            strcmp(cmd.name, "sev") == 0  || strcmp(cmd.name, "sez") == 0   ||
-            strcmp(cmd.name, "sen") == 0) {
+        if (strcmp(cmd.name, "unknown") == 0) {
+        } else if (strcmp(cmd.name, "halt") == 0 || strcmp(cmd.name, "ccc") == 0   ||
+                   strcmp(cmd.name, "clc") == 0  || strcmp(cmd.name, "clv") == 0   ||
+                   strcmp(cmd.name, "clz") == 0  || strcmp(cmd.name, "cln") == 0   ||
+                   strcmp(cmd.name, "nop") == 0  || strcmp(cmd.name, "reset") == 0 ||
+                   strcmp(cmd.name, "scc") == 0  || strcmp(cmd.name, "sec") == 0   ||
+                   strcmp(cmd.name, "sev") == 0  || strcmp(cmd.name, "sez") == 0   ||
+                   strcmp(cmd.name, "sen") == 0) {
             print_log(LOG_TRACE, "%06o %06o: %s", current_pc, w, cmd.name);
         } else if (strcmp(cmd.name, "br") == 0 || strcmp(cmd.name, "bpl") == 0  || 
                  strcmp(cmd.name, "bne") == 0  || strcmp(cmd.name, "beq") == 0  ||
@@ -244,10 +232,10 @@ void run(void) {
                 print_log(LOG_TRACE, "%06o %06o: jsr R%d, %s", current_pc, w, r, dd_str);
             }
         } else if (strcmp(cmd.name, "rts") == 0) {
-            if (n == 7) {
+            if (r == 7) {
                 print_log(LOG_TRACE, "%06o %06o: return", current_pc, w);
             } else {
-                print_log(LOG_TRACE, "%06o %06o: rts R%d", current_pc, w, n);
+                print_log(LOG_TRACE, "%06o %06o: rts R%d", current_pc, w, r);
             }
         } else if (strcmp(cmd.name, "ash") == 0) {
             char ss_str[32] = "";
@@ -611,15 +599,16 @@ void do_tst(void) {
     flag_C = 0;
 }
 
-void do_jsr(void) {    
+void do_jsr(void) {
+    Word target_pc = dd.adr;
     SP -= 2;
     w_write(SP, reg[r], MEMSPACE);
     reg[r] = PC;
-    PC = dd.adr;
+    PC = target_pc;
 }
 
 void do_rts(void) {
-    int link_reg = n; 
+    int link_reg = r; 
     PC = reg[link_reg];
     reg[link_reg] = w_read(SP);
     SP += 2;
@@ -1157,6 +1146,8 @@ void do_div(void) {
     flag_C = 0;
 }
 
-void do_nothing(void) {
-    printf("unknown\n");
+void do_unknown(void) {
+    Word w = w_read(PC - 2);
+    print_log(LOG_ERROR, "Unknown instruction %06o at address %06o", w, PC - 2);
+    exit(1);
 }

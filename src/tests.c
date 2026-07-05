@@ -246,7 +246,6 @@ static void reset_cpu_state(void) {
     //очистка служебных переменных декодера
     byte_cmd = 0;
     r = 0;
-    n = 0;
     nn = 0;
     xx = 0;
     
@@ -1099,14 +1098,13 @@ void test_jsr_rts(void) {
     assert(PC == 046466);
 
     //возврат из SUBB
-    n = 2;
     do_rts();
     
     assert(PC == 046454);
     assert(reg[2] == 024616);
     
     //возврат из SUBA
-    n = 2;
+    r = 2;
     do_rts();
     
     assert(PC == 024616);
