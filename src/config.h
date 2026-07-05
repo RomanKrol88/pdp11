@@ -6,6 +6,7 @@
 
 typedef unsigned char Byte;     //8-битный байт
 typedef unsigned short Word;    //16-битное слово
+typedef unsigned int DWord;     //32-битный формат для симметрии
 typedef Word Address;           //16-битный адрес памяти
 
 #endif

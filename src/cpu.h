@@ -45,50 +45,45 @@ typedef struct {
     char params;
 } Command;
 
-void reg_dump(void);                                            //функция дампа регистров
-void run(void);                                                 //функция распознавания и запуска программ
-Arg get_operand(Word w);                                        //функция разбора агрумента на моду и регистр и вывода на печать
-Command parse_cmd(Word w);                                      //декодер команд процессора
-void w_reg_write(int r, Word val);                              //функция записи слова в регистр
-void set_flags_mov(Word val);                                   //функция установки флагов для команд MOV, MOVB, CLR
-void set_flags_add(Word src, Word dst, unsigned int res32);     //функция установки флагов для команды ADD
+void reg_dump(void);                    //функция дампа регистров
+void run(void);                         //функция распознавания и запуска программ
+Arg get_operand(Word w);                //функция разбора агрумента на моду и регистр и вывода на печать
+Command parse_cmd(Word w);              //декодер команд процессора
+void w_reg_write(int r, Word val);      //функция записи слова в регистр
+void set_flags_NZ(Word val);            //функция выставления флагов N и Z
+void set_flag_C(DWord val);             //функция выставления флага переноса C по 32-битному результату
 
 //команды процессора:
 //арифметика и пересылки данных
-void do_mov(void);      // MOV    [01SSDD] NZVC=**0- | Словесная пересылка данных (d = s)
-void do_movb(void);     // MOVb   [11SSDD] NZVC=**0- | Байтовая пересылка данных (d = s)
+void do_mov(void);      // MOV    [01SSDD] NZVC=**0- | Пересылка данных (d = s)
 void do_add(void);      // ADD    [06SSDD] NZVC=**** | Сложение слов (d = s + d)
 void do_sub(void);      // SUB    [16SSDD] NZVC=**** | Вычитание слов (d = d - s)
-void do_cmp(void);      // CMP    [020000] NZVC=**** | Сравнение слова или байта (s - d)
-void do_tst(void);      // TSTb   [B055DD] NZVC=**00 | Проверка слова или байта (d), без записи
-void do_clr(void);      // CLR    [0050DD] NZVC=0100 | Очистка слова (d = 0)
-void do_clrb(void);     // CLRb   [1050DD] NZVC=0100 | Очистка байта (d = 0)
-void do_inc(void);      // INCb   [B052DD] NZVC=***- | Увеличение слова или байта на 1 (d = d + 1)
-void do_decb(void);     // DECb   [B053DD] NZVC=***- | Уменьшение на 1 (d = d - 1)
-void do_negb(void);     // NEGb   [B054DD] NZVC=**** | Смена знака байта (d = -d)
+void do_cmp(void);      // CMP    [020000] NZVC=**** | Сравнение (s - d)
+void do_tst(void);      // TSTb   [B055DD] NZVC=**00 | Проверка (d), без записи
+void do_clr(void);      // CLR    [0050DD] NZVC=0100 | Очистка слова или байта (d = 0)
+void do_inc(void);      // INC    [B052DD] NZVC=***- | Увеличение на 1 (d = d + 1)
+void do_dec(void);      // DEC    [B053DD] NZVC=***- | Уменьшение на 1 (d = d - 1)
+void do_neg(void);      // NEG    [B054DD] NZVC=**** | Смена знака (d = -d)
 
 //многоразрядная математика и сдвиги
-void do_adcb(void);     // ADCb   [B055DD] NZVC=**** | Прибавление переноса (d = d + C)
-void do_sbcb(void);     // SBCb   [B056DD] NZVC=**** | Вычитание переноса (d = d - C)
+void do_adc(void);      // ADC    [B055DD] NZVC=**** | Прибавление переноса (d = d + C)
+void do_sbc(void);      // SBC    [B056DD] NZVC=**** | Вычитание переноса (d = d - C)
 void do_sxt(void);      // SXT    [0067DD] NZVC=-*0- | Знаковое расширение флага N в слово (d = 0 или -1)
 void do_mul(void);      // MUL    [070RSS] NZVC=**0* | Умножение слов (R, R|1 = R * SS) (EIS)
 void do_div(void);      // DIV    [071RSS] NZVC=**** | Деление слов (R = частное, R|1 = остаток) (EIS)
 void do_ash(void);      // ASH    [072RSS] NZVC=**** | Арифметический сдвиг регистра (r = r * 2^s) (EIS)
 void do_ashc(void);     // ASHC   [073RSS] NZVC=**** | Арифметический сдвиг пары регистров (EIS)
-void do_asl(void);      // ASL    [0063DD] NZVC=**** | Словесный арифметический сдвиг влево (d = d * 2)
-void do_aslb(void);     // ASLb   [1063DD] NZVC=**** | Байтовый арифметический сдвиг влево (d = d * 2)
-void do_asr(void);      // ASR    [0062DD] NZVC=**** | Словесный арифметический сдвиг вправо (d = d / 2)
-void do_asrb(void);     // ASRb   [1062DD] NZVC=**** | Байтовый арифметический сдвиг вправо (d = d / 2)
-void do_rolb(void);     // ROLb   [B061DD] NZVC=**** | Циклический сдвиг слова или байта влево через перенос
-void do_rorb(void);     // RORb   [B060DD] NZVC=**** | Циклический сдвиг слова или байта вправо через перенос
-void do_swab(void);     // SWAB   [0003DD] NZVC=**00 | Побайтовый обмен в слове (флаги по новому мл.байту)
+void do_asl(void);      // ASL    [0063DD] NZVC=**** | Арифметический сдвиг влево (d = d * 2)
+void do_asr(void);      // ASR    [0062DD] NZVC=**** | Арифметический сдвиг вправо (d = d / 2)
+void do_rol(void);      // ROL    [B061DD] NZVC=**** | Циклический сдвиг влево через перенос
+void do_ror(void);      // ROR    [B060DD] NZVC=**** | Циклический сдвиг вправо через перенос
+void do_swab(void);     // SWAB   [0003DD] NZVC=**00 | Побайтовый обмен в слове (флаги по новому младшему байту)
 
 //побитовая логика
-void do_bic(void);      // BICb   [B4SSDD] NZVC=**0- | Сброс битов по маске (d = d & {~s})
-void do_bisb(void);     // BISb   [B5SSDD] NZVC=**0- | Установка битов / Логическое ИЛИ (d = d | s)
-void do_bitb(void);     // BITb   [B3SSDD] NZVC=**0- | Проверка битов / Логическое И (d & s), без записи
-void do_com(void);      // COM    [000510] NZVC=**01 | Словесная побитовая инверсия (d = ~d)
-void do_comb(void);     // COMb   [B051DD] NZVC=**01 | Побитовая инверсия получателя (d = ~d)
+void do_bic(void);      // BIC    [B4SSDD] NZVC=**0- | Сброс битов по маске (d = d & {~s})
+void do_bis(void);      // BIS    [B5SSDD] NZVC=**0- | Установка битов / Логическое ИЛИ (d = d | s)
+void do_bit(void);      // BIT    [B3SSDD] NZVC=**0- | Проверка битов / Логическое И (d & s), без записи
+void do_com(void);      // COM    [000510] NZVC=**01 | Побитовая инверсия получателя (d = ~d)
 void do_xor(void);      // XOR    [074RDD] NZVC=**0- | Исключающее ИЛИ регистра и памяти (d = d ^ r)
 
 //безусловные переходы и подпрограммы

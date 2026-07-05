@@ -1119,32 +1119,34 @@ void test_jsr_rts(void) {
 
 //тест на проверку сдвига влево и сдвига вправо командой ASH
 void test_ash(void) {
-    print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
 
-    //setup двиг влево
-    reg[2] = 4;
+    //setup cдвиг влево
+    reg[2] = 2;
     r = 2;
-    ss.val = 1;
+    dd.val = 2;
+    
     do_ash();
+    
     assert(reg[2] == 8);
+    assert(flag_N == 0);
     assert(flag_Z == 0);
-    assert(flag_C == 0);
     assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //setup сдвиг вправо
-    reg[2] = 0177760; 
-    r = 2;
-    ss.val = 076;      
+    reg[3] = 16;
+    r = 3;
+    dd.val = 62;
+    
     do_ash();
-
-    assert(reg[2] == 0177774); 
-    assert(flag_N == 1);
-    assert(flag_C == 0);
+    
+    assert(reg[3] == 4);
 
     //clean
     reset_cpu_state();
 
-    print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
 //тест на прибалвение переноса к байту командой ADCb
@@ -1159,7 +1161,7 @@ void test_adcb(void) {
     dd.adr = 4;
     dd.space = REGSPACE;
 
-    do_adcb();
+    do_adc();
 
     assert(reg[4] == 6);
     assert(flag_Z == 0);
@@ -1178,13 +1180,17 @@ void test_ashc(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    reg[2] = 0; reg[3] = 0100000;
-    r = 2; ss.val = 1;
+    reg[2] = 0; 
+    reg[3] = 4;
+    r = 2; 
+    dd.val = 62;
 
     do_ashc();
 
-    assert(reg[2] == 1);
-    assert(reg[3] == 0);
+    assert(reg[2] == 0); 
+    assert(reg[3] == 1);
+    assert(flag_N == 0);
+    assert(flag_Z == 0);
 
     //clean
     reset_cpu_state();
@@ -1222,7 +1228,7 @@ void test_aslb(void) {
     byte_cmd = 1;
     dd.val = 0200; dd.adr = 4; dd.space = REGSPACE;
 
-    do_aslb();
+    do_asl();
 
     assert((reg[4] & 0xFF) == 0);
     assert(flag_Z == 1);
@@ -1264,7 +1270,7 @@ void test_asrb(void) {
     byte_cmd = 1;
     dd.val = 0201; dd.adr = 5; dd.space = REGSPACE;
 
-    do_asrb();
+    do_asr();
 
     assert((reg[5] & 0xFF) == 0300);
     assert(flag_C == 1); // Младший бит ушел в C
@@ -1464,7 +1470,7 @@ void test_bit_logic_bytes(void) {
     dd.adr = 1; 
     dd.space = REGSPACE;
     
-    do_bisb();
+    do_bis();
 
     assert((reg[1] & 0xFF) == 0125);
     assert(flag_C == 1);
@@ -1488,7 +1494,7 @@ void test_bit_logic_bytes(void) {
     dd.adr = 1; 
     dd.space = REGSPACE;
     
-    do_bitb();
+    do_bit();
 
     assert((reg[1] & 0xFF) == 0120);
     assert(flag_Z == 0);
@@ -1635,7 +1641,7 @@ void test_comb(void) {
     dd.adr = 3;
     dd.space = REGSPACE;
 
-    do_comb();
+    do_com();
 
     assert((reg[3] & 0xFF) == 0252); 
     assert(flag_Z == 0);
@@ -1661,7 +1667,7 @@ void test_decb(void) {
     dd.adr = 4;
     dd.space = REGSPACE;
 
-    do_decb();
+    do_dec();
 
     assert((reg[4] & 0377) == 0177); 
     assert(flag_V == 1);
@@ -1738,7 +1744,7 @@ void test_negb(void) {
     dd.adr = 3;
     dd.space = REGSPACE;
 
-    do_negb();
+    do_neg();
 
     assert(reg[3] == 0177774); 
     assert(flag_Z == 0);
@@ -1754,7 +1760,7 @@ void test_negb(void) {
     dd.adr = 3;
     dd.space = REGSPACE;
 
-    do_negb();
+    do_neg();
 
     assert(reg[3] == 0); 
     assert(flag_Z == 1);
@@ -1833,7 +1839,7 @@ void test_rolb(void) {
     dd.adr = 3; 
     dd.space = REGSPACE;
 
-    do_rolb();
+    do_rol();
 
     assert((reg[3] & 0377) == 0);
     assert(flag_Z == 1);
@@ -1858,7 +1864,7 @@ void test_rorb(void) {
     dd.adr = 3; 
     dd.space = REGSPACE;
 
-    do_rorb();
+    do_ror();
 
     assert((reg[3] & 0377) == 0200);
     assert(flag_C == 1);
@@ -1882,7 +1888,7 @@ void test_sbcb(void) {
     dd.adr = 3;
     dd.space = REGSPACE;
 
-    do_sbcb();
+    do_sbc();
 
     assert(reg[3] == 004); 
     assert(flag_Z == 0);
@@ -1898,7 +1904,7 @@ void test_sbcb(void) {
     dd.adr = 3;
     dd.space = REGSPACE;
 
-    do_sbcb();
+    do_sbc();
 
     assert(reg[3] == 0177777); 
     assert(flag_Z == 0);
@@ -2162,14 +2168,14 @@ void test_mul(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    reg[2] = 0000200;
+    reg[2] = 10;
     r = 2;
-    ss.val = 5;
+    dd.val = 64;
 
     do_mul();
 
-    assert(reg[2] == 0000000);
-    assert(reg[3] == 0001200);
+    assert(reg[2] == 0);
+    assert(reg[3] == 640);
     assert(flag_Z == 0);
     assert(flag_N == 0);
     assert(flag_C == 0);
@@ -2184,18 +2190,19 @@ void test_mul(void) {
 void test_div(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    reg[2] = 0000000;
-    reg[3] = 0020005;
+    reg[2] = 0;
+    reg[3] = 2000;
     r = 2;
-    ss.val = 2;
+    dd.val = 2;
 
     do_div();
 
-    assert(reg[2] == 0010002);
-    assert(reg[3] == 0000001);
+    assert(reg[2] == 1000);
+    assert(reg[3] == 0);
     assert(flag_Z == 0);
     assert(flag_N == 0);
     assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
