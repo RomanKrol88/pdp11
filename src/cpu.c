@@ -97,40 +97,6 @@ int byte_cmd = 0;           //1 — команда BYTE, 0 — команда WO
 
 int output_print = 0;       //переменная для беспрефиксного вывода stdout на дисплей
 
-void format_arg(Arg arg, Word bits, char *out_str) {
-    int m = (bits >> 3) & 7;
-    int r = bits & 7;
-
-    switch (m) {
-        case 0: sprintf(out_str, "R%d", r); break;
-        case 1: sprintf(out_str, "(R%d)", r); break;
-        case 2: 
-            if (r == 7) sprintf(out_str, "#%o", arg.val);
-            else sprintf(out_str, "(R%d)+", r);
-            break;
-        case 3: 
-            if (r == 7) sprintf(out_str, "@#%o", arg.adr);
-            else sprintf(out_str, "@(R%d)+", r);
-            break;
-        case 4: 
-            sprintf(out_str, "-(R%d)", r); 
-            break;
-        case 5: 
-            sprintf(out_str, "@-(R%d)", r); 
-            break;
-        case 6:
-            Word x = arg.adr - reg[r];
-            if (r == 7) sprintf(out_str, "%o", arg.adr);
-            else sprintf(out_str, "%o(R%d)", x, r);
-            break;
-        case 7:
-            if (r == 7) sprintf(out_str, "@#%o", arg.adr);
-            else sprintf(out_str, "@#%o", arg.adr);
-            break;
-        default: sprintf(out_str, "?"); break;
-    }
-}
-
 void reg_dump() {
     print_log(LOG_TRACE, "R0:%o R1:%o R2:%o R3:%o R4:%o R5:%o R6:%o R7:%o", reg[0], reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]);
 }
@@ -144,11 +110,11 @@ Command parse_cmd(Word w) {
         if ((w & command[i].mask) == command[i].opcode) {   
             //проверка флага SS
             if (command[i].params & HAS_SS) {
-                    ss = get_mr(w >> 6);
+                ss = get_operand(w >> 6);
             }
             //проверка флага DD
             if (command[i].params & HAS_DD) {
-                dd = get_mr(w);
+                dd = get_operand(w);
             }
             //проверка флага RLEFT
             if (command[i].params & HAS_RLEFT) {
@@ -220,16 +186,12 @@ void run(void) {
                    strcmp(cmd.name, "rolb") == 0 || strcmp(cmd.name, "rorb") == 0 || 
                    strcmp(cmd.name, "sbcb") == 0 || strcmp(cmd.name, "swab") == 0 || 
                    strcmp(cmd.name, "sxt") == 0) {
-            char dd_str[32] = "";
-            format_arg(dd, w, dd_str);
-            print_log(LOG_TRACE, "%06o %06o: %s %s", current_pc, w, cmd.name, dd_str);
+            print_log(LOG_TRACE, "%06o %06o: %s %s", current_pc, w, cmd.name, dd.name);
         } else if (strcmp(cmd.name, "jsr") == 0) {
-            char dd_str[32] = "";
-            format_arg(dd, w, dd_str);
             if (r == 7) {
-                print_log(LOG_TRACE, "%06o %06o: call %s", current_pc, w, dd_str);
+                print_log(LOG_TRACE, "%06o %06o: call %s", current_pc, w, dd.name);
             } else {
-                print_log(LOG_TRACE, "%06o %06o: jsr R%d, %s", current_pc, w, r, dd_str);
+                print_log(LOG_TRACE, "%06o %06o: jsr R%d, %s", current_pc, w, r, dd.name);
             }
         } else if (strcmp(cmd.name, "rts") == 0) {
             if (r == 7) {
@@ -237,27 +199,13 @@ void run(void) {
             } else {
                 print_log(LOG_TRACE, "%06o %06o: rts R%d", current_pc, w, r);
             }
-        } else if (strcmp(cmd.name, "ash") == 0) {
-            char ss_str[32] = "";
-            format_arg(ss, w, ss_str);
-            print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, ss_str, r);
-        } else if (strcmp(cmd.name, "ashc") == 0 || strcmp(cmd.name, "mul") == 0 || 
-                   strcmp(cmd.name, "div") == 0) {
-            char ss_str[32] = "";
-            format_arg(ss, w, ss_str);
-            print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, ss_str, r);
+        } else if (strcmp(cmd.name, "ash") == 0 || strcmp(cmd.name, "ashc") == 0 || 
+                   strcmp(cmd.name, "mul") == 0 || strcmp(cmd.name, "div") == 0) {
+            print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, dd.name, r);
         } else if (strcmp(cmd.name, "xor") == 0) {
-            char dd_str[32] = "";
-            format_arg(dd, w, dd_str);
-            print_log(LOG_TRACE, "%06o %06o: %s R%d, %s", current_pc, w, cmd.name, r, dd_str);
+            print_log(LOG_TRACE, "%06o %06o: %s R%d, %s", current_pc, w, cmd.name, r, dd.name);
         } else {
-            char ss_str[32] = "";
-            char dd_str[32] = "";
-
-            format_arg(ss, w >> 6, ss_str);
-            format_arg(dd, w, dd_str);
-
-            print_log(LOG_TRACE, "%06o %06o: %s %s, %s", current_pc, w, cmd.name, ss_str, dd_str);
+            print_log(LOG_TRACE, "%06o %06o: %s %s, %s", current_pc, w, cmd.name, ss.name, dd.name);
         }
 
         // выполняем команду
@@ -267,12 +215,16 @@ void run(void) {
     }
 }
 
-Arg get_mr(Word w) {
+Arg get_operand(Word w) {
     Arg res;
+    memset(&res, 0, sizeof(Arg));
+
     Address pointer_adr;    // указатель на адрес
     Word x;                 // смещение (для моды 6 и 7)
     int m = (w >> 3) & 7;   // номер моды
     int r = w & 7;          // номер регистра
+
+    res.space = MEMSPACE;   //записываем в память (кроме моды 0)
 
     switch (m) {
         //мода 0, R1
@@ -280,6 +232,7 @@ Arg get_mr(Word w) {
             res.adr = r;                                //адрес - номер регистра
             res.val = reg[r];                           //значение - число в регистре
             res.space = REGSPACE;                       //записываем в регистр
+            sprintf(res.name, "R%d", r);                //трассировка
             break;
 
         //мода 1, (R1)
@@ -291,7 +244,7 @@ Arg get_mr(Word w) {
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }                                       
-            res.space = MEMSPACE;                       //записываем в память
+            sprintf(res.name, "(R%d)", r);              //трассировка
             break;
 
         //мода 2, (R1)+ или #3
@@ -303,7 +256,10 @@ Arg get_mr(Word w) {
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }
-            res.space = MEMSPACE;                       //записываем в память
+
+            //трассировка
+            if (r == 7) sprintf(res.name, "#%o", res.val);
+            else sprintf(res.name, "(R%d)+", r);
             
             //регистры SP и PC всегда изменяются на 2
             if (byte_cmd && r < 6) {
@@ -317,9 +273,13 @@ Arg get_mr(Word w) {
         case 3:
             pointer_adr = reg[r];                 
             res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
-            reg[r] += 2;                                //автоинкремент регистра (всегда +2)
             res.val = w_read(res.adr);                  //по целевому адресу - значение
-            res.space = MEMSPACE;                       //записываем в память
+
+            //трассировка
+            if (r == 7) sprintf(res.name, "@#%o", res.adr);
+            else sprintf(res.name, "@(R%d)+", r);
+
+            reg[r] += 2;                                //автоинкремент регистра (всегда +2)
             break;
 
         // мода 4, -(R1)
@@ -335,7 +295,7 @@ Arg get_mr(Word w) {
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }
-            res.space = MEMSPACE;                       //записываем в память
+            sprintf(res.name, "-(R%d)", r);             //трассировка
             break;
 
         //мода 5, @-(R1)
@@ -344,7 +304,7 @@ Arg get_mr(Word w) {
             pointer_adr = reg[r];                       //в регистре адрес
             res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
             res.val = w_read(res.adr);                  //по целевому адресу - значение
-            res.space = MEMSPACE;                       //записываем в память
+            sprintf(res.name, "@-(R%d)", r);            //трассировка
             break;
 
         //мода 6, X(R1) или X(PC)
@@ -353,7 +313,10 @@ Arg get_mr(Word w) {
             PC += 2;
             res.adr = (Address)(reg[r] + (short)x);     //адрес указателя со смещением
             res.val = w_read(res.adr);                  //по адресу - значение
-            res.space = MEMSPACE;                       //записываем в память
+
+            //трассировка
+            if (r == 7) sprintf(res.name, "%o", res.adr);
+            else sprintf(res.name, "%o(R%d)", x, r);
             break;
 
         //мода 7, @X(R1) или @X(PC)
@@ -363,7 +326,10 @@ Arg get_mr(Word w) {
             pointer_adr = (Address)(reg[r] + (short)x); //адрес указателя со смещением
             res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
             res.val = w_read(res.adr);                  //по целевому адресу - значение
-            res.space = MEMSPACE;                       //записываем в память
+
+            //трассировка
+            if (r == 7) sprintf(res.name, "@#%o", res.adr);
+            else sprintf(res.name, "@#%o", res.adr);
             break;
 
         default:

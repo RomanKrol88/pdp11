@@ -31,9 +31,10 @@ extern int byte_cmd;
 extern int xx;
 
 typedef struct {
-    Word val;       //значение
-    Address adr;    //адрес
+    Word val;       //значение операнда
+    Address adr;    //адрес операнда
     int space;      //пространство адресов (регистры или ОЗУ)
+    char name[32];  //имя аргумента для трассировки
 } Arg;
 
 typedef struct {
@@ -44,10 +45,9 @@ typedef struct {
     char params;
 } Command;
 
-void format_arg(Arg arg, Word bits, char *out_str);             //функция вывода на печать лога
 void reg_dump(void);                                            //функция дампа регистров
 void run(void);                                                 //функция распознавания и запуска программ
-Arg get_mr(Word w);                                             //функция разбора агрумента на моду и регистр
+Arg get_operand(Word w);                                        //функция разбора агрумента на моду и регистр и вывода на печать
 Command parse_cmd(Word w);                                      //декодер команд процессора
 void w_reg_write(int r, Word val);                              //функция записи слова в регистр
 void set_flags_mov(Word val);                                   //функция установки флагов для команд MOV, MOVB, CLR
