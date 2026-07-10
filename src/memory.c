@@ -24,6 +24,10 @@ void b_write (Address adr, Byte val) {
             //режим вывода без трассировки
             static int is_new_line = 1;
 
+            if (val == '\r') {
+                return;
+            }
+
             if (is_new_line) {
                 printf("[PDP11 OUTPUT] ");
                 is_new_line = 0;
@@ -73,6 +77,11 @@ void w_write (Address adr, Word val, int space) {
             print_log(LOG_OUTPUT, "%c", byte_val);
         } else {
             static int is_new_line = 1;
+
+            if (byte_val == '\r') {
+                return;
+            }
+
             if (is_new_line) {
                 printf("[PDP11 OUTPUT] ");
                 is_new_line = 0;

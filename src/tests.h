@@ -21,25 +21,25 @@ void test_branches(void);                   //тест (комплексная �
 void test_tst(void);                        //тест на выставление отрицательного байта N в TST и TSTb
 void test_jsr_rts(void);                    //тест на вызов подпрограмм JSR/RTS по регистру R2
 void test_ash(void);                        //тест на проверку сдвига влево и сдвига вправо командой ASH
-void test_adcb(void);                       //тест на прибалвение переноса к байту командой ADCb
+void test_adc(void);                        //тест на прибавление переноса командой ADC
 void test_ashc(void);                       //тест на работу команды ASHC
 void test_asl(void);                        //тест на работу команды ASL со словом
 void test_aslb(void);                       //тест на работу команды ASLb с байтом
 void test_asr(void);                        //тест на работу команды ASR со словом
 void test_asrb(void);                       //тест на работу команды ASRb с байтом
-void test_bit_logic_bytes(void);            //тест на работу байтовых логических команд BICb, BISb, BITb
+void test_bit_logic_bytes(void);            //тест на работу логических команд BIC, BIS, BIT
 void test_clear_flags(void);                //тест на работу команд очистки флагов CLC, CLV, CLZ, CLN, CCC
-void test_cmpb(void);                       //тест на работу команды сравнения байт CMPb
-void test_comb(void);                       //тест на работу команды байтовой инверсии COMb
-void test_decb(void);                       //тест на работу команды декремента DECb
+void test_cmp(void);                        //тест на работу команды сравнения CMP
+void test_com(void);                        //тест на работу команды инверсии COM
+void test_dec(void);                        //тест на работу команды декремента DEC
 void test_inc(void);                        //тест на работу команды инкремента INC
 void test_jmp(void);                        //тест на работу команды безусловного перехода JMP
-void test_negb(void);                       //тест на работу команды смены знака NEGb
+void test_neg(void);                        //тест на работу команды смены знака NEG
 void test_nop(void);                        //тест на работу пустой команды NOP
 void test_reset(void);                      //тест на работу сброса командой RESET
-void test_rolb(void);                       //тест на работу циклического сдвига влево командой ROLb
-void test_rorb(void);                       //тест на работу циклического сдвига вправо командой ROLb
-void test_sbcb(void);                       //тест на работу команды байтового вычитания переноса SBCb
+void test_rol(void);                        //тест на работу циклического сдвига влево командой ROL
+void test_ror(void);                        //тест на работу циклического сдвига вправо командой ROR
+void test_sbc(void);                        //тест на работу команды вычитания переноса SBC
 void test_set_flags(void);                  //тест на работу команд установки флагов
 void test_sub(void);                        //тест на вычитание командой SUB
 void test_swab(void);                       //тест на перестановку байт командой SWAb

@@ -11,7 +11,7 @@
 extern Byte mem[MEMSIZE];
 extern Word reg[REGSIZE];
 extern Arg ss, dd;
-extern int r, n, nn, xx;
+extern int r, nn, xx;
 
 typedef enum {
     TEST_MEM            =  1,
@@ -43,7 +43,7 @@ typedef enum {
     TEST_TST            = 27,
     TEST_JSR_RTS        = 28,
     TEST_ASH            = 29,
-    TEST_ADCB           = 30,
+    TEST_ADC            = 30,
     TEST_ASHC           = 31,
     TEST_ASL            = 32,
     TEST_ASLB           = 33,
@@ -51,17 +51,17 @@ typedef enum {
     TEST_ASRB           = 35,
     TEST_BIT_LOGIC      = 36,
     TEST_CLR_FL         = 37,
-    TEST_CMPB           = 38,
-    TEST_COMB           = 39,
-    TEST_DECB           = 40,
+    TEST_CMP            = 38,
+    TEST_COM            = 39,
+    TEST_DEC            = 40,
     TEST_INC            = 41,
     TEST_JMP            = 42,
-    TEST_NEGB           = 43,
+    TEST_NEG            = 43,
     TEST_NOP            = 44,
     TEST_RESET          = 45,
-    TEST_ROLB           = 46,
-    TEST_RORB           = 47,
-    TEST_SBCB           = 48,
+    TEST_ROL            = 46,
+    TEST_ROR            = 47,
+    TEST_SBC            = 48,
     TEST_SET_FL         = 49,
     TEST_SUB            = 50,
     TEST_SWAB           = 51,
@@ -107,7 +107,7 @@ static const TestCase test_table[] = {
     {TEST_TST,              "test_tst",                 test_tst},
     {TEST_JSR_RTS,          "test_jsr_rts",             test_jsr_rts},
     {TEST_ASH,              "test_ash",                 test_ash},
-    {TEST_ADCB,             "test_adcb",                test_adcb},
+    {TEST_ADC,              "test_adc",                 test_adc},
     {TEST_ASHC,             "test_ashc",                test_ashc},
     {TEST_ASL,              "test_asl",                 test_asl},
     {TEST_ASLB,             "test_aslb",                test_aslb},
@@ -115,17 +115,17 @@ static const TestCase test_table[] = {
     {TEST_ASRB,             "test_asrb",                test_asrb},
     {TEST_BIT_LOGIC,        "test_bit_logic_bytes",     test_bit_logic_bytes},
     {TEST_CLR_FL,           "test_clr_fl",              test_clear_flags},
-    {TEST_CMPB,             "test_cmpb",                test_cmpb},
-    {TEST_COMB,             "test_comb",                test_comb},
-    {TEST_DECB,             "test_decb",                test_decb},
+    {TEST_CMP,              "test_cmp",                 test_cmp},
+    {TEST_COM ,             "test_com",                 test_com},
+    {TEST_DEC,              "test_dec",                 test_dec},
     {TEST_INC,              "test_inc",                 test_inc},
     {TEST_JMP,              "test_jmp",                 test_jmp},
-    {TEST_NEGB,             "test_negb",                test_negb},
+    {TEST_NEG,              "test_neg",                 test_neg},
     {TEST_NOP,              "test_nop",                 test_nop},
     {TEST_RESET,            "test_reset",               test_reset},
-    {TEST_ROLB,             "test_rolb",                test_rolb},
-    {TEST_RORB,             "test_rorb",                test_rorb},
-    {TEST_SBCB,             "test_sbcb",                test_sbcb},
+    {TEST_ROL,              "test_rol",                 test_rol},
+    {TEST_ROR,              "test_ror",                 test_ror},
+    {TEST_SBC,              "test_sbc",                 test_sbc},
     {TEST_SET_FL,           "test_set_fl",              test_set_flags},
     {TEST_SUB,              "test_sub",                 test_sub},
     {TEST_SWAB,             "test_swab",                test_swab},
@@ -189,7 +189,7 @@ void run_test_by_id(int id) {
         case TEST_TST           :   test_tst();                     break;
         case TEST_JSR_RTS       :   test_jsr_rts();                 break;
         case TEST_ASH           :   test_ash();                     break;
-        case TEST_ADCB          :   test_adcb();                    break;
+        case TEST_ADC           :   test_adc();                     break;
         case TEST_ASHC          :   test_ashc();                    break;
         case TEST_ASL           :   test_asl();                     break;
         case TEST_ASLB          :   test_aslb();                    break;
@@ -197,17 +197,17 @@ void run_test_by_id(int id) {
         case TEST_ASRB          :   test_asrb();                    break;
         case TEST_BIT_LOGIC     :   test_bit_logic_bytes();         break;
         case TEST_CLR_FL        :   test_clear_flags();             break;
-        case TEST_CMPB          :   test_cmpb();                    break;
-        case TEST_COMB          :   test_comb();                    break;
-        case TEST_DECB          :   test_decb();                    break;
+        case TEST_CMP           :   test_cmp();                     break;
+        case TEST_COM           :   test_com();                     break;
+        case TEST_DEC           :   test_dec();                     break;
         case TEST_INC           :   test_inc();                     break;
         case TEST_JMP           :   test_jmp();                     break;
-        case TEST_NEGB          :   test_negb();                    break;
+        case TEST_NEG           :   test_neg();                     break;
         case TEST_NOP           :   test_nop();                     break;
         case TEST_RESET         :   test_reset();                   break;
-        case TEST_ROLB          :   test_rolb();                    break;
-        case TEST_RORB          :   test_rorb();                    break;
-        case TEST_SBCB          :   test_sbcb();                    break;
+        case TEST_ROL           :   test_rol();                     break;
+        case TEST_ROR           :   test_ror();                     break;
+        case TEST_SBC           :   test_sbc();                     break;
         case TEST_SET_FL        :   test_set_flags();               break;
         case TEST_SUB           :   test_sub();                     break;
         case TEST_SWAB          :   test_swab();                    break;
@@ -251,7 +251,9 @@ static void reset_cpu_state(void) {
     
     //сброс структуры операндов
     ss.val = 0; ss.adr = 0; ss.space = 0;
+    memset(ss.name, 0, sizeof(ss.name));
     dd.val = 0; dd.adr = 0; dd.space = 0;
+    memset(dd.name, 0, sizeof(dd.name));
 }
 
 
@@ -267,7 +269,7 @@ void test_mem(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //пишем байт, читаем байт
-    a = 0;
+    a = 000000;
     b0 = 0x12;
     b_write(a, b0);
     bres = b_read(a);
@@ -276,7 +278,7 @@ void test_mem(void) {
     assert(b0 == bres);
     
     //пишем слово, читаем слово
-    a = 2;        // другой адрес
+    a = 000002;        // другой адрес
     w = 0x3456;
     w_write(a, w, MEMSPACE);
     wres = w_read(a);
@@ -285,7 +287,7 @@ void test_mem(void) {
     assert(w == wres);
     
     //пишем 2 байта, читаем 1 слово
-    a = 4;        // другой адрес
+    a = 000004;        // другой адрес
     w = 0xa1b2;
     //little-endian, младшие разряды по меньшему адресу
     b0 = 0xb2;
@@ -300,7 +302,7 @@ void test_mem(void) {
     //еще тесты:
 
     //чтение и запись байта по нечетному адресу
-    a = 1;
+    a = 000001;
     b0 = 0x78;
     b_write(a, b0);
     bres = b_read(a);
@@ -308,7 +310,7 @@ void test_mem(void) {
     assert(b0 == bres);
 
     //пишем слово, читаем побайтово (проверка Little-Endian)
-    a = 6;
+    a = 000006;
     w = 0xCDE1;
     w_write(a, w, MEMSPACE);
     b0 = b_read(a);     // должен быть младший байт: 0xE1
@@ -320,7 +322,7 @@ void test_mem(void) {
     //проверка отрицательных чисел (старший бит равен 1):
 
     //пишем и читаем отрицательный байт
-    a = 1; 
+    a = 000001; 
     signed_b0 = -123; 
     b_write(a, (Byte)signed_b0);
     signed_bres = (signed char)b_read(a);
@@ -328,7 +330,7 @@ void test_mem(void) {
     assert(signed_b0 == signed_bres);
 
     //пишем отрицательное слово, читаем побайтово (проверка Little-Endian)
-    a = 10;
+    a = 000012;
     signed_w = -3678;    //0xF1A2
     w_write(a, (Word)signed_w, MEMSPACE);
     signed_b0 = (signed char)b_read(a);       //должен быть младший байт: 0xA2 (-94)
@@ -340,10 +342,10 @@ void test_mem(void) {
     /*
     //тесты, вызывающие падение программы:
     print_log(LOG_INFO, "Пишем слово по нечетному адресу");
-    w_write(1, 0x1234); 
+    w_write(000001, 0x1234); 
 
     print_log(LOG_INFO, "Читаем слово по нечетному адресу");
-    w_read(3);
+    w_read(000003);
     */
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
@@ -355,12 +357,19 @@ void test_mem(void) {
 void test_parse_mov(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    Command cmd = parse_cmd(0010604);
+    //MOV (опкод 0010604)
+    Command cmd_mov = parse_cmd(0010604);
+    assert(strcmp(cmd_mov.name, "mov") == 0);
+    reset_cpu_state();
 
-    assert(strcmp(cmd.name, "mov") == 0);
+    //ADD (опкод 0060102)
+    Command cmd_add = parse_cmd(0060102);
+    assert(strcmp(cmd_add.name, "add") == 0);
+    reset_cpu_state();
 
-    //clean
+    //HALT (опкод 0000000)
+    Command cmd_halt = parse_cmd(0000000);
+    assert(strcmp(cmd_halt.name, "halt") == 0);
     reset_cpu_state();
 
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
@@ -370,15 +379,35 @@ void test_parse_mov(void) {
  void test_mov(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[3] = 12;    // dd
-    reg[5] = 34;    // ss
-    Command cmd = parse_cmd(0010503);
+    //MOV
+    reg[3] = 12;
+    reg[5] = 34;
+    
+    byte_cmd = 0; 
 
-    cmd.do_command();
+    Command cmd_word = parse_cmd(0010503);
+
+    cmd_word.do_command();
 
     assert(reg[3] == 34);
     assert(reg[5] == 34);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+
+    reset_cpu_state();
+
+    //MOVb
+    reg[3] = 0;
+    reg[5] = 0x00F1;
+    
+    Command cmd_byte = parse_cmd(0110503);
+    
+    cmd_byte.do_command();
+
+    assert(reg[3] == 0xFFF1); 
+    assert(reg[5] == 0x00F1); 
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
 
     //clean
     reset_cpu_state();
@@ -402,7 +431,11 @@ void test_sob(void) {
     cmd.do_command();
 
     assert(reg[1] == 4);
-    assert(PC == 001012); 
+    assert(PC == 001012);
+    assert(flag_N == 0);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //setup 2
     reg[1] = 1;       //последняя итерация цикла
@@ -412,6 +445,10 @@ void test_sob(void) {
 
     assert(reg[1] == 0);
     assert(PC == 001020);
+    assert(flag_N == 0);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -423,7 +460,7 @@ void test_sob(void) {
 void test_clr(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
+    //setup CLR
     reg[4] = 1234;
 
     Command cmd = parse_cmd(0005004);
@@ -431,6 +468,25 @@ void test_clr(void) {
     cmd.do_command();
 
     assert(reg[4] == 0);
+    assert(flag_Z == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
+
+    //clean
+    reset_cpu_state();
+
+    //setup CLRb
+    reg[4] = 5678; 
+
+    Command cmd_byte = parse_cmd(0105004);
+    cmd_byte.do_command();
+
+    assert(reg[4] == 0);
+    assert(flag_Z == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -450,8 +506,12 @@ void test_mode0(void) {
 
     assert(ss.val == 34);
     assert(ss.adr == 5);
+    assert(ss.space == REGSPACE);
+    assert(strcmp(ss.name, "R5") == 0);
     assert(dd.val == 12);
     assert(dd.adr == 3);
+    assert(dd.space == REGSPACE);
+    assert(strcmp(dd.name, "R3") == 0);
 
     //clean
     reset_cpu_state();
@@ -464,20 +524,27 @@ void test_mode1_toreg(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     // setup
     reg[3] = 12;
-    reg[5] = 0200;
-    w_write(0200, 34, MEMSPACE);
+    reg[5] = 000200;
+    w_write(000200, 34, MEMSPACE);
 
     Command cmd = parse_cmd(0011503);
 
     assert(ss.val == 34);
-    assert(ss.adr == 0200);
+    assert(ss.adr == 000200);
+    assert(ss.space == MEMSPACE);
+    assert(strcmp(ss.name, "(R5)") == 0);
     assert(dd.val == 12);
     assert(dd.adr == 3);
+    assert(dd.space == REGSPACE);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 34);
-    assert(reg[5] == 0200);
+    assert(reg[5] == 000200);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -490,22 +557,28 @@ void test_mode1_fromreg(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     //setup
     reg[3] = 75;
-    reg[5] = 0400;
-    w_write(0400, 0, MEMSPACE);
+    reg[5] = 000400;
+    w_write(000400, 0, MEMSPACE);
 
     Command cmd = parse_cmd(0010315);
 
     assert(ss.val == 75);
     assert(ss.adr == 3);
     assert(ss.space == REGSPACE);
+    assert(strcmp(ss.name, "R3") == 0);
 
-    assert(dd.adr == 0400);
+    assert(dd.adr == 000400);
     assert(dd.space == MEMSPACE);
+    assert(strcmp(dd.name, "(R5)") == 0);
 
     cmd.do_command();
 
-    assert(w_read(0400) == 75);
+    assert(w_read(000400) == 75);
     assert(reg[3] == 75);
+    assert(reg[5] == 000400);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -519,23 +592,25 @@ void test_mode2_reg(void) {
 
     //setup
     reg[3] = 0;
-    reg[5] = 0200;
-    w_write(0200, 55, MEMSPACE);
+    reg[5] = 000200;
+    w_write(000200, 55, MEMSPACE);
 
     Command cmd = parse_cmd(0012503);
 
     assert(ss.val == 55);
-    assert(ss.adr == 0200);
+    assert(ss.adr == 000200);
     assert(ss.space == MEMSPACE);
+    assert(strcmp(ss.name, "(R5)+") == 0);
 
     assert(dd.val == 0);
     assert(dd.adr == 3);
     assert(dd.space == REGSPACE);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 55);
-    assert(reg[5] == 0202);
+    assert(reg[5] == 000202);
 
     //clean
     reset_cpu_state();
@@ -549,19 +624,24 @@ void test_mode2_pc(void) {
 
     //setup
     reg[3] = 0;
-    PC = 02000;
+    PC = 002000;
     w_write(002000, 77, MEMSPACE);
 
     Command cmd = parse_cmd(0012703);
 
     assert(ss.val == 77);
-    assert(ss.adr == 02000);
+    assert(ss.adr == 002000);
     assert(ss.space == MEMSPACE);
+    assert(strcmp(ss.name, "#115") == 0);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 77);
-    assert(PC == 02002);
+    assert(PC == 002002);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -575,20 +655,25 @@ void test_mode3_reg(void) {
 
     //setup
     reg[3] = 0;
-    reg[5] = 0200;
-    w_write(0200, 0400, MEMSPACE);
-    w_write(0400, 85, MEMSPACE);
+    reg[5] = 000200;
+    w_write(000200, 000400, MEMSPACE);
+    w_write(000400, 85, MEMSPACE);
 
     Command cmd = parse_cmd(0013503);
 
     assert(ss.val == 85);
-    assert(ss.adr == 0400);
+    assert(ss.adr == 000400);
     assert(ss.space == MEMSPACE);
+    assert(strcmp(ss.name, "@(R5)+") == 0);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 85);
-    assert(reg[5] == 0202);
+    assert(reg[5] == 000202);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -602,20 +687,26 @@ void test_mode3_pc(void) {
 
     //setup
     reg[3] = 0;
-    PC = 02000;
-    w_write(02000, 0400, MEMSPACE);
-    w_write(0400, 99, MEMSPACE);
+    PC = 002000;
+    w_write(002000, 000400, MEMSPACE);
+    w_write(000400, 99, MEMSPACE);
 
     Command cmd = parse_cmd(0013703);
 
     assert(ss.val == 99);
-    assert(ss.adr == 0400);
+    assert(ss.adr == 000400);
     assert(ss.space == MEMSPACE);
+    assert(strncmp(ss.name, "@#", 2) == 0);
+    assert(strstr(ss.name, "400") != NULL);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 99);
-    assert(PC == 02002);
+    assert(PC == 002002);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -629,18 +720,27 @@ void test_mode4(void) {
 
     //setup
     reg[3] = 88;
-    reg[5] = 0402;
-    w_write(0400, 0, MEMSPACE);
+    reg[5] = 000402;
+    w_write(000400, 0, MEMSPACE);
 
     Command cmd = parse_cmd(0010345);
 
-    assert(dd.adr == 0400);
+    assert(ss.val == 88);
+    assert(ss.adr == 3);
+    assert(ss.space == REGSPACE);
+    assert(strcmp(ss.name, "R3") == 0);
+    assert(dd.adr == 000400);
     assert(dd.space == MEMSPACE);
+    assert(strcmp(dd.name, "-(R5)") == 0);
 
     cmd.do_command();
 
-    assert(w_read(0400) == 88);
-    assert(reg[5] == 0400);
+    assert(w_read(000400) == 88);
+    assert(reg[5] == 000400);
+    assert(reg[3] == 88);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -654,21 +754,29 @@ void test_mode5(void) {
 
     //setup
     reg[3] = 0;
-    reg[5] = 0402;
+    reg[5] = 000402;
     
-    w_write(0400, 0600, MEMSPACE); 
-    w_write(0600, 95, MEMSPACE);
+    w_write(000400, 000600, MEMSPACE); 
+    w_write(000600, 95, MEMSPACE);
 
     Command cmd = parse_cmd(0015503);
 
     assert(ss.val == 95);
-    assert(ss.adr == 0600);
+    assert(ss.adr == 000600);
     assert(ss.space == MEMSPACE);
+    assert(strcmp(ss.name, "@-(R5)") == 0);
+    assert(dd.val == 0);
+    assert(dd.adr == 3);
+    assert(dd.space == REGSPACE);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 95);
-    assert(reg[5] == 0400);
+    assert(reg[5] == 000400);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -682,24 +790,29 @@ void test_mode6_reg(void) {
 
     //setup
     reg[3] = 0;
-    reg[5] = 0200;
+    reg[5] = 000200;
     
-    PC = 02000;
-    w_write(02000, 4, MEMSPACE);
+    PC = 002000;
+    w_write(002000, 4, MEMSPACE);
     
-    w_write(0204, 66, MEMSPACE); 
+    w_write(000204, 66, MEMSPACE); 
 
     Command cmd = parse_cmd(0016503);
 
     assert(ss.val == 66);
-    assert(ss.adr == 0204);
+    assert(ss.adr == 000204);
     assert(ss.space == MEMSPACE);
+    assert(strcmp(ss.name, "4(R5)") == 0);
     assert(PC == 02002);
+     assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 66);
-    assert(reg[5] == 0200);
+    assert(reg[5] == 000200);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -713,21 +826,25 @@ void test_mode6_pc(void) {
 
     //setup
     reg[3] = 0;
-    PC = 02000;
-    w_write(02000, 010, MEMSPACE);
+    PC = 002000;
+    w_write(002000, 010, MEMSPACE);
 
     w_write(002012, 123, MEMSPACE);
 
     Command cmd = parse_cmd(0016703);
 
     assert(ss.val == 123);
-    assert(ss.adr == 02012);
+    assert(ss.adr == 002012);
     assert(ss.space == MEMSPACE);
-    assert(PC == 02002);
+    assert(strstr(ss.name, "2012") != NULL);
+    assert(PC == 002002);
 
     cmd.do_command();
 
     assert(reg[3] == 123);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -741,24 +858,30 @@ void test_mode7_reg(void) {
 
     //setup
     reg[3] = 0;
-    reg[5] = 0200;
+    reg[5] = 000200;
     
-    PC = 02000;
-    w_write(02000, 4, MEMSPACE);
-    w_write(0204, 0600, MEMSPACE); 
-    w_write(0600, 77, MEMSPACE); 
+    PC = 002000;
+    w_write(002000, 4, MEMSPACE);
+    w_write(000204, 000600, MEMSPACE); 
+    w_write(000600, 77, MEMSPACE); 
 
     Command cmd = parse_cmd(0017503);
 
     assert(ss.val == 77);
-    assert(ss.adr == 0600);
+    assert(ss.adr == 000600);
     assert(ss.space == MEMSPACE);
-    assert(PC == 02002);
+    assert(strncmp(ss.name, "@#", 2) == 0);
+    assert(strstr(ss.name, "600") != NULL);
+    assert(PC == 002002);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 77);
-    assert(reg[5] == 0200);
+    assert(reg[5] == 000200);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -772,21 +895,27 @@ void test_mode7_pc(void) {
 
     //setup
     reg[3] = 0;
-    PC = 02000;
-    w_write(02000, 010, MEMSPACE);
-    w_write(02012, 0700, MEMSPACE);
-    w_write(0700, 150, MEMSPACE);
+    PC = 002000;
+    w_write(002000, 8, MEMSPACE);
+    w_write(002012, 000700, MEMSPACE);
+    w_write(000700, 150, MEMSPACE);
 
     Command cmd = parse_cmd(0017703);
 
     assert(ss.val == 150);
-    assert(ss.adr == 0700);
+    assert(ss.adr == 000700);
     assert(ss.space == MEMSPACE);
-    assert(PC == 02002);
+    assert(strncmp(ss.name, "@#", 2) == 0);
+    assert(strstr(ss.name, "700") != NULL);
+    assert(PC == 002002);
+    assert(strcmp(dd.name, "R3") == 0);
 
     cmd.do_command();
 
     assert(reg[3] == 150);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -822,7 +951,7 @@ void test_flags_mov_negative(void) {
     
     //setup
     flag_Z = 1; flag_N = 0; flag_V = 1;
-    reg[5] = 0177777;
+    reg[5] = 0xFFFF;
 
     Command cmd = parse_cmd(0010503);
 
@@ -831,6 +960,7 @@ void test_flags_mov_negative(void) {
     assert(flag_N == 1);
     assert(flag_Z == 0);
     assert(flag_V == 0);
+    assert(flag_C == 0);
     
     //clean
     reset_cpu_state();
@@ -844,8 +974,8 @@ void test_flags_add_carry(void) {
     
     //setup
     flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 0;
-    reg[5] = 0177777;
-    reg[3] = 01;
+    reg[5] = 0xFFFF;
+    reg[3] = 1;
 
     Command cmd = parse_cmd(0060503);
 
@@ -869,8 +999,8 @@ void test_flags_add_overflow(void) {
     
     //setup
     flag_N = 0; flag_Z = 1; flag_V = 0; flag_C = 1;
-    reg[5] = 040000;
-    reg[3] = 040000;
+    reg[5] = 16384;
+    reg[3] = 16384;
 
     Command cmd = parse_cmd(0060503);
     
@@ -892,8 +1022,7 @@ void test_br(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    PC = 01002; 
-    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 0;
+    PC = 001002;
 
     Command cmd = parse_cmd(0000400);
     
@@ -902,12 +1031,8 @@ void test_br(void) {
 
     cmd.do_command();
 
-    assert(PC == 01002);
-    assert(flag_N == 1);
-    assert(flag_Z == 0);
-    assert(flag_V == 1);
-    assert(flag_C == 0);
-
+    assert(PC == 001002);
+ 
     //clean
     reset_cpu_state();
 
@@ -919,14 +1044,14 @@ void test_br_forward(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
-    PC = 01002;
+    PC = 001002;
 
     Command cmd = parse_cmd(0000402);
     assert(xx == 2);
 
     cmd.do_command();
 
-    assert(PC == 01006);
+    assert(PC == 001006);
 
     //clean
     reset_cpu_state();
@@ -939,14 +1064,14 @@ void test_br_backward(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
     
     //setup
-    PC = 01006;
+    PC = 001006;
 
     Command cmd = parse_cmd(0000775);
     assert(xx == -3);
 
     cmd.do_command();
 
-    assert(PC == 01000);
+    assert(PC == 001000);
 
     //clean
     reset_cpu_state();
@@ -960,20 +1085,29 @@ void test_beq(void) {
     
     //setup Z = 1
     flag_Z = 1;
-    PC = 01002;
+    flag_N = 1; flag_V = 0; flag_C = 1;
+    PC = 001002;
 
     Command cmd = parse_cmd(0001402);
     cmd.do_command();
 
-    assert(PC == 01006);
+    assert(PC == 001006);
+    assert(flag_Z == 1);
+    assert(flag_N == 1);
+    assert(flag_V == 0);
+    assert(flag_C == 1);
 
     //setup Z = 0
     flag_Z = 0;
-    PC = 01002;
+    PC = 001002;
 
     cmd.do_command();
 
     assert(PC == 01002);
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_V == 0);
+    assert(flag_C == 1);
 
     //clean
     reset_cpu_state();
@@ -987,20 +1121,29 @@ void test_bpl(void) {
     
     //setup N = 0
     flag_N = 0;
-    PC = 01002;
+    flag_Z = 1; flag_V = 0; flag_C = 1;
+    PC = 001002;
 
     Command cmd = parse_cmd(0100002);
     cmd.do_command();
 
-    assert(PC == 01006);
+    assert(PC == 001006);
+    assert(flag_N == 0);
+    assert(flag_Z == 1);
+    assert(flag_V == 0);
+    assert(flag_C == 1);
 
     //setup N = 1
     flag_N = 1;
-    PC = 01002;
+    PC = 001002;
 
     cmd.do_command();
 
-    assert(PC == 01002);
+    assert(PC == 001002);
+    assert(flag_N == 1);
+    assert(flag_Z == 1);
+    assert(flag_V == 0);
+    assert(flag_C == 1);
 
     //clean
     reset_cpu_state();
@@ -1015,20 +1158,29 @@ void test_bne(void) {
     //setup Z = 0
     for (int i = 0; i < 8; i++) reg[i] = 0;
     flag_Z = 0;
-    PC = 01002;
+    flag_N = 1; flag_V = 1; flag_C = 0;
+    PC = 001002;
 
     Command cmd = parse_cmd(0001002);
     cmd.do_command();
 
-    assert(PC == 01006);
+    assert(PC == 001006);
+    assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_V == 1);
+    assert(flag_C == 0);
 
     //setup Z = 1
     flag_Z = 1;
-    PC = 01002;
+    PC = 001002;
 
     cmd.do_command();
 
     assert(PC == 01002);
+    assert(flag_Z == 1);
+    assert(flag_N == 1);
+    assert(flag_V == 1);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1042,11 +1194,13 @@ void test_tst(void) {
 
     //setup TST
     byte_cmd = 0;
-    flag_C = 1; flag_V = 1;
-    dd.val = 0100000;
-    dd.adr = 1; dd.space = REGSPACE;
+    flag_C = 1; flag_V = 1; flag_N = 0; flag_Z = 1;
+    dd.val = 0x8000;
+    dd.adr = 1; 
+    dd.space = REGSPACE;
 
     do_tst();
+
     assert(flag_N == 1);
     assert(flag_Z == 0);
     assert(flag_V == 0);
@@ -1054,13 +1208,17 @@ void test_tst(void) {
 
     //setup TSTb
     byte_cmd = 1;
-    flag_N = 1;
+    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 1;
     dd.val = 0;
-    dd.adr = 1; dd.space = REGSPACE;
+    dd.adr = 1; 
+    dd.space = REGSPACE;
 
     do_tst();
+
     assert(flag_Z == 1);
     assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1074,6 +1232,7 @@ void test_jsr_rts(void) {
 
     SP = 0177700; 
     reg[2] = 12;
+    flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
     
     //SUBA
     PC = 024616;
@@ -1096,6 +1255,10 @@ void test_jsr_rts(void) {
     assert(reg[2] == 046454);
     assert(w_read(SP) == 024616);
     assert(PC == 046466);
+    assert(flag_N == 0); 
+    assert(flag_Z == 0); 
+    assert(flag_V == 0); 
+    assert(flag_C == 0);
 
     //возврат из SUBB
     do_rts();
@@ -1110,6 +1273,10 @@ void test_jsr_rts(void) {
     assert(PC == 024616);
     assert(reg[2] == 12);
     assert(SP == 0177700);
+    assert(flag_N == 0); 
+    assert(flag_Z == 0); 
+    assert(flag_V == 0); 
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1142,6 +1309,10 @@ void test_ash(void) {
     do_ash();
     
     assert(reg[3] == 4);
+    assert(flag_N == 0);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1150,13 +1321,13 @@ void test_ash(void) {
 }
 
 //тест на прибалвение переноса к байту командой ADCb
-void test_adcb(void) {
+void test_adc(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[4] = 5;
+    //setup ADCb
     byte_cmd = 1;
-    flag_C = 1;
+    flag_C = 1; flag_N = 1; flag_Z = 1; flag_V = 1;
+    reg[4] = 5;
     dd.val = 5;
     dd.adr = 4;
     dd.space = REGSPACE;
@@ -1167,6 +1338,24 @@ void test_adcb(void) {
     assert(flag_Z == 0);
     assert(flag_N == 0);
     assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //setup ADC
+    byte_cmd = 0;
+    flag_C = 1;
+    flag_N = 1; flag_Z = 0; flag_V = 1;
+    
+    reg[4] = 0xFFFF;
+    dd.val = 0xFFFF;
+    dd.adr = 4;
+    dd.space = REGSPACE;
+
+    do_adc();
+
+    assert(reg[4] == 0);
+    assert(flag_Z == 1);
+    assert(flag_C == 1);
+    assert(flag_N == 0);
     assert(flag_V == 0);
 
     //clean
@@ -1184,6 +1373,7 @@ void test_ashc(void) {
     reg[3] = 4;
     r = 2; 
     dd.val = 62;
+    flag_N = 1; flag_Z = 1; flag_V = 1; flag_C = 1;
 
     do_ashc();
 
@@ -1191,6 +1381,8 @@ void test_ashc(void) {
     assert(reg[3] == 1);
     assert(flag_N == 0);
     assert(flag_Z == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1203,15 +1395,20 @@ void test_asl(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    reg[1] = 0100000;
+    reg[1] = 0x8000;
     byte_cmd = 0;
-    dd.val = 0100000; dd.adr = 1; dd.space = REGSPACE;
+    dd.val = 0x8000; 
+    dd.adr = 1; 
+    dd.space = REGSPACE;
+    flag_N = 1; flag_Z = 0; flag_V = 0; flag_C = 0;
 
     do_asl();
 
     assert(reg[1] == 0);
     assert(flag_Z == 1);
     assert(flag_C == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 1);
     
     //clean
     reset_cpu_state();
@@ -1224,15 +1421,20 @@ void test_aslb(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    reg[4] = 0200;
+    reg[4] = 0x80;
     byte_cmd = 1;
-    dd.val = 0200; dd.adr = 4; dd.space = REGSPACE;
+    dd.val = 0x80; 
+    dd.adr = 4; 
+    dd.space = REGSPACE;
+    flag_N = 1; flag_Z = 0; flag_V = 0; flag_C = 0;
 
     do_asl();
 
     assert((reg[4] & 0xFF) == 0);
     assert(flag_Z == 1);
     assert(flag_C == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 1); 
 
     //clean
     reset_cpu_state();
@@ -1240,20 +1442,25 @@ void test_aslb(void) {
     print_log(LOG_TRACE,"Function <%s> is OK", __FUNCTION__);
 }
 
-//тест на работу команды R со словом
+//тест на работу команды ASR со словом
 void test_asr(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    reg[2] = 0100001;
+    reg[2] = 0x8001;
     byte_cmd = 0;
-    dd.val = 0100001; dd.adr = 2; dd.space = REGSPACE;
+    dd.val = 0x8001; 
+    dd.adr = 2; 
+    dd.space = REGSPACE;
+    flag_N = 0; flag_Z = 1; flag_V = 1; flag_C = 0;
 
     do_asr();
 
-    assert(reg[2] == 0140000);
+    assert(reg[2] == 0xC000);
     assert(flag_C == 1);
     assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -1266,15 +1473,20 @@ void test_asrb(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    reg[5] = 0201;
+    reg[5] = 0x81;
     byte_cmd = 1;
-    dd.val = 0201; dd.adr = 5; dd.space = REGSPACE;
+    dd.val = 0x81; 
+    dd.adr = 5; 
+    dd.space = REGSPACE;
+    flag_N = 0; flag_Z = 1; flag_V = 1; flag_C = 0;
 
     do_asr();
 
-    assert((reg[5] & 0xFF) == 0300);
-    assert(flag_C == 1); // Младший бит ушел в C
+    assert((reg[5] & 0xFF) == 0xC0);
+    assert(flag_C == 1);
     assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -1290,165 +1502,170 @@ void test_branches(void) {
     xx = 4;
 
     //setup BCS, BCC, BLO, BHIS
-    PC = 01000; 
-    flag_C = 1;
+    PC = 001000; 
+    flag_C = 1; flag_N = 0; flag_Z = 0; flag_V = 0;
 
     do_bcs();
 
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_C == 1 && flag_N == 0 && flag_Z == 0 && flag_V == 0);
 
-    PC = 01000; 
-    flag_C = 1;
+    PC = 001000; 
+    flag_C = 1; flag_N = 0; flag_Z = 0; flag_V = 0;
 
     do_bcc();
 
-    assert(PC == 01000);
+    assert(PC == 001000);
+    assert(flag_C == 1 && flag_N == 0 && flag_Z == 0 && flag_V == 0);
 
     //setup BMI, BPL, BEQ, BNE
-    PC = 01000; 
-    flag_N = 1;
+    PC = 001000; 
+    flag_C = 0; flag_N = 1; flag_Z = 0; flag_V = 0;
 
     do_bmi(); 
 
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_C == 0 && flag_N == 1 && flag_Z == 0 && flag_V == 0);
 
-    PC = 01000; 
-    flag_N = 1;
+    PC = 001000; 
+    flag_C = 0; flag_N = 0; flag_Z = 1; flag_V = 0;
 
     do_bpl(); 
     
-    assert(PC == 01000);
+    assert(PC == 001010);
+    assert(flag_C == 0 && flag_N == 0 && flag_Z == 1 && flag_V == 0);
 
-    PC = 01000; 
-    flag_Z = 1;
+    PC = 001000; 
+    flag_C = 0; flag_N = 0; flag_Z = 1; flag_V = 0;
 
     do_beq(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_C == 0 && flag_N == 0 && flag_Z == 1 && flag_V == 0);
 
-    PC = 01000; 
-    flag_Z = 1;
+    PC = 001000; 
+    flag_C = 0; flag_N = 0; flag_Z = 1; flag_V = 0;
 
     do_bne(); 
     
-    assert(PC == 01000);
+    assert(PC == 001000);
+    assert(flag_C == 0 && flag_N == 0 && flag_Z == 1 && flag_V == 0);
 
     //setup BHI, BLOS
-    PC = 01000; 
-    flag_C = 0; 
-    flag_Z = 0;
+    PC = 001000; 
+    flag_C = 0; flag_Z = 0; flag_N = 0; flag_V = 0;
 
     do_bhi(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_C == 0 && flag_Z == 0);
 
-    PC = 01000; 
-    flag_C = 1; 
-    flag_Z = 0;
+    PC = 001000; 
+    flag_C = 1; flag_Z = 0; flag_N = 0; flag_V = 0;
 
     do_bhi(); 
     
-    assert(PC == 01000);
+    assert(PC == 001000);
+    assert(flag_C == 1 && flag_Z == 0);
 
-    PC = 01000; 
-    flag_C = 1; 
-    flag_Z = 0;
-
-    do_blos(); 
-    
-    assert(PC == 01010);
-
-    PC = 01000; 
-    flag_C = 0; 
-    flag_Z = 1;
+    PC = 001000;
+    flag_C = 1; flag_Z = 0; flag_N = 0; flag_V = 0; 
 
     do_blos(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_C == 1 && flag_Z == 0);
 
-    PC = 01000; 
-    flag_C = 0; 
-    flag_Z = 0;
+    PC = 001000; 
+    flag_C = 0; flag_Z = 1; flag_N = 0; flag_V = 0;
 
     do_blos(); 
     
-    assert(PC == 01000);
+    assert(PC == 001010);
+    assert(flag_C == 0 && flag_Z == 1);
+
+    PC = 001000; 
+    flag_C = 0; flag_Z = 0; flag_N = 0; flag_V = 0;
+
+    do_blos(); 
+    
+    assert(PC == 001000);
+    assert(flag_C == 0 && flag_Z == 0);
 
     //setup BGE, BLT, BGT, BLE
-    PC = 01000; 
-    flag_N = 1; 
-    flag_V = 0;
+    PC = 001000; 
+    flag_N = 1; flag_V = 0; flag_Z = 0; flag_C = 0;
 
     do_blt(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_N == 1 && flag_V == 0);
 
-    PC = 01000; 
-    flag_N = 1; 
-    flag_V = 1;
+    PC = 001000; 
+    flag_N = 1; flag_V = 1; flag_Z = 0; flag_C = 0;
 
     do_bge(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_N == 1 && flag_V == 1);
 
-    PC = 01000; 
-    flag_Z = 0; 
-    flag_N = 1; 
-    flag_V = 1;
-
-    do_bgt(); 
-    
-    assert(PC == 01010);
-
-    PC = 01000; 
-    flag_Z = 1; 
-    flag_N = 1; 
-    flag_V = 1;
+    PC = 001000; 
+    flag_Z = 0; flag_N = 1; flag_V = 1; flag_C = 0;
 
     do_bgt(); 
     
-    assert(PC == 01000);
+    assert(PC == 001010);
+    assert(flag_Z == 0 && flag_N == 1 && flag_V == 1);
 
-    PC = 01000; 
-    flag_Z = 1; 
-    flag_N = 0; 
-    flag_V = 0;
+    PC = 001000; 
+    flag_Z = 1; flag_N = 1; flag_V = 1; flag_C = 0;
+
+    do_bgt(); 
+    
+    assert(PC == 001000);
+    assert(flag_Z == 1 && flag_N == 1 && flag_V == 1);
+
+    PC = 001000; 
+    flag_Z = 1; flag_N = 0; flag_V = 0; flag_C = 0;
 
     do_ble(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_Z == 1 && flag_N == 0 && flag_V == 0);
 
-    PC = 01000; 
-    flag_Z = 0; 
-    flag_N = 1; 
-    flag_V = 0;
+    PC = 001000; 
+    flag_Z = 0; flag_N = 1; flag_V = 0; flag_C = 0;
 
     do_ble(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_Z == 0 && flag_N == 1 && flag_V == 0);
 
     //setup BVC, BVS
 
-    PC = 01000; 
-    flag_V = 1;
+    PC = 001000; 
+    flag_V = 1; flag_N = 0; flag_Z = 0; flag_C = 0;
 
     do_bvs(); 
     
-    assert(PC == 01010);
+    assert(PC == 001010);
+    assert(flag_V == 1);
 
-    PC = 01000; 
-    flag_V = 0;
-
-    do_bvc(); 
-    
-    assert(PC == 01010);
-
-    PC = 01000; 
-    flag_V = 1;
+    PC = 001000; 
+    flag_V = 0; flag_N = 0; flag_Z = 0; flag_C = 0;
 
     do_bvc(); 
     
-    assert(PC == 01000);
+    assert(PC == 001010);
+    assert(flag_V == 0);
+
+    PC = 001000; 
+    flag_V = 1; flag_N = 0; flag_Z = 0; flag_C = 0;
+
+    do_bvc(); 
+    
+    assert(PC == 001000);
+    assert(flag_V == 1);
 
     //clean
     reset_cpu_state();
@@ -1456,70 +1673,125 @@ void test_branches(void) {
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
-//тест на работу байтовых логических команд BICb, BISb, BITb
+//тест на работу логических команд BIC, BIS, BIT
 void test_bit_logic_bytes(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup for all
+    //setup for BICb, BISb, BITb
+    byte_cmd = 1;
     flag_C = 1;
 
     //setup BISb
-    reg[1] = 0005;
-    ss.val = 0120;
-    dd.val = 0005; 
+    reg[1] = 0x05;
+    ss.val = 0x50;
+    dd.val = 0x05; 
     dd.adr = 1; 
     dd.space = REGSPACE;
     
     do_bis();
 
-    assert((reg[1] & 0xFF) == 0125);
+    assert((reg[1] & 0xFF) == 0x55);
     assert(flag_C == 1);
     assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0); 
 
     //setup BICb
-    ss.val = 0005;
-    dd.val = 0125; 
+    ss.val = 0x05;
+    dd.val = 0x55;
     dd.adr = 1; 
     dd.space = REGSPACE;
     
     do_bic();
 
-    assert((reg[1] & 0xFF) == 0120);
+    assert((reg[1] & 0xFF) == 0x50);
     assert(flag_C == 1);
     assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //setup BITb
-    ss.val = 0020;
-    dd.val = 0120; 
+    reg[1] = 0x50; 
+    ss.val = 0x10; 
+    dd.val = 0x50; 
     dd.adr = 1; 
     dd.space = REGSPACE;
     
     do_bit();
 
-    assert((reg[1] & 0xFF) == 0120);
-    assert(flag_Z == 0);
+    assert((reg[1] & 0xFF) == 0x50); 
+    assert(flag_Z == 0); 
     assert(flag_C == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    //setup for BIC, BIS, BIT
+    byte_cmd = 0;
+    flag_C = 0;
+
+    //setup BIS
+    reg[3] = 0x00FF;
+    ss.val = 0x8000; 
+    dd.val = 0x00FF;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_bis();
+
+    assert(reg[3] == 0x80FF);
+    assert(flag_C == 0);
+    assert(flag_Z == 0);
+    assert(flag_N == 1); 
+    assert(flag_V == 0);
+
+    //setup BIC
+    ss.val = 0x80FF; 
+    dd.val = 0x80FF;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_bic();
+
+    assert(reg[3] == 0); 
+    assert(flag_Z == 1); 
+    assert(flag_N == 0);
+    assert(flag_C == 0);
+    assert(flag_V == 0);
+
+    //setup BIT
+    reg[3] = 0x80FF;
+    ss.val = 0x8000;
+    dd.val = 0x80FF;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_bit();
+
+    assert(reg[3] == 0x80FF);
+    assert(flag_Z == 0); 
+    assert(flag_N == 1);
+    assert(flag_C == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
 
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
-
 
 //тест на работу команд очистки флагов CLC, CLV, CLZ, CLN, CCC
 void test_clear_flags(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup for all
-    PC = 01002; 
+    PC = 001002; 
 
     //setup CLC
-    flag_C = 1; 
-    flag_V = 1; 
-    flag_Z = 1; 
-    flag_N = 1;
-    w_write(01000, 0000241, MEMSPACE);
+    flag_C = 1; flag_V = 1; flag_Z = 1; flag_N = 1;
+    w_write(001000, 0x00A1, MEMSPACE);
 
     do_clr_fl();
 
@@ -1529,11 +1801,8 @@ void test_clear_flags(void) {
     assert(flag_N == 1);
 
     //setup CLV
-    flag_C = 1; 
-    flag_V = 1; 
-    flag_Z = 1; 
-    flag_N = 1;
-    w_write(01000, 0000242, MEMSPACE);
+    flag_C = 1; flag_V = 1; flag_Z = 1; flag_N = 1;
+    w_write(001000, 0x00A2, MEMSPACE);
 
     do_clr_fl();
 
@@ -1543,11 +1812,8 @@ void test_clear_flags(void) {
     assert(flag_N == 1);
 
     //setup CLZ
-    flag_C = 1; 
-    flag_V = 1; 
-    flag_Z = 1; 
-    flag_N = 1;
-    w_write(01000, 0000244, MEMSPACE);
+    flag_C = 1; flag_V = 1; flag_Z = 1; flag_N = 1;
+    w_write(001000, 0x00A4, MEMSPACE);
 
     do_clr_fl();
 
@@ -1557,11 +1823,8 @@ void test_clear_flags(void) {
     assert(flag_N == 1);
 
     //setup CLN
-    flag_C = 1; 
-    flag_V = 1; 
-    flag_Z = 1; 
-    flag_N = 1;
-    w_write(01000, 0000250, MEMSPACE);
+    flag_C = 1; flag_V = 1; flag_Z = 1; flag_N = 1;
+    w_write(001000, 0x00A8, MEMSPACE);
 
     do_clr_fl();
 
@@ -1571,11 +1834,8 @@ void test_clear_flags(void) {
     assert(flag_Z == 1);
 
     //setup CCC
-    flag_C = 1; 
-    flag_V = 1; 
-    flag_Z = 1; 
-    flag_N = 1;
-    w_write(01000, 0000257, MEMSPACE);
+    flag_C = 1; flag_V = 1; flag_Z = 1; flag_N = 1;
+    w_write(01000, 0x00AF, MEMSPACE);
 
     do_clr_fl();
 
@@ -1590,61 +1850,92 @@ void test_clear_flags(void) {
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
-
-//тест на работу команды сравнения байт CMPb
-void test_cmpb(void) {
+//тест на работу команды сравнения байт CMP
+void test_cmp(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup на равные байты
-    reg[2] = 055;
-    ss.val = 055;
-    dd.val = 055; 
+    //setup CMP
+    byte_cmd = 0;
+    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 1;
+
+    reg[2] = 45;
+    ss.val = 45;
+    dd.val = 45; 
     dd.adr = 2; 
     dd.space = REGSPACE;
 
     do_cmp();
 
-    assert(reg[2] == 055);
+    assert(reg[2] == 45);
     assert(flag_Z == 1);
     assert(flag_N == 0);
     assert(flag_C == 0);
     assert(flag_V == 0);
 
-    //setup в SS меньшее в DD большее
-    reg[2] = 020;
-    ss.val = 010;
-    dd.val = 020; 
+    //clean
+    reset_cpu_state();
+
+    //setup CMPb
+    byte_cmd = 1;
+    flag_N = 0; flag_Z = 1; flag_V = 1; flag_C = 0;
+
+    reg[2] = 16;
+    ss.val = 8;
+    dd.val = 16; 
     dd.adr = 2; 
     dd.space = REGSPACE;
 
     do_cmp();
 
-    assert(reg[2] == 020);
+    assert(reg[2] == 16);
     assert(flag_Z == 0);
     assert(flag_C == 1);
+    assert(flag_N == 1);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
 
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
-//тест на работу команды байтовой инверсии COMb
-void test_comb(void) {
+
+//тест на работу команды инверсии COM
+void test_com(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[3] = 0125; 
+    //setup COMb
     byte_cmd = 1;
-    flag_C = 0;
-    flag_V = 1;
-    dd.val = 0125;
+    flag_C = 0; flag_V = 1; flag_N = 0; flag_Z = 1;
+    
+    reg[3] = 0x55; 
+    dd.val = 0x55;
     dd.adr = 3;
     dd.space = REGSPACE;
 
     do_com();
 
-    assert((reg[3] & 0xFF) == 0252); 
+    assert((reg[3] & 0xFF) == 0xAA); 
     assert(flag_Z == 0);
+    assert(flag_N == 1);
+    assert(flag_V == 0);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    //setup COM
+    byte_cmd = 0;
+    flag_C = 0; flag_V = 1; flag_N = 1; flag_Z = 0;
+    
+    reg[3] = 0;
+    dd.val = 0;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_com();
+
+    assert(reg[3] == 0xFFFF);
+    assert(flag_Z == 0); 
     assert(flag_N == 1);
     assert(flag_V == 0);
     assert(flag_C == 1);
@@ -1655,25 +1946,48 @@ void test_comb(void) {
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
-//тест на работу команды декремента DECb
-void test_decb(void) {
+//тест на работу команды декремента DEC
+void test_dec(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[4] = 0200;
+    //setup DECb
     byte_cmd = 1;
     flag_C = 1;
-    dd.val = 0200;
+    flag_N = 1; flag_Z = 1; flag_V = 0;
+    
+    reg[4] = 0x80; 
+    dd.val = 0x80;
     dd.adr = 4;
     dd.space = REGSPACE;
 
     do_dec();
 
-    assert((reg[4] & 0377) == 0177); 
+    assert((reg[4] & 0xFF) == 0x7F); 
     assert(flag_V == 1);
     assert(flag_Z == 0);
     assert(flag_N == 0);
     assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    //setup DEC
+    byte_cmd = 0;
+    flag_C = 0;
+    flag_N = 0; flag_Z = 1; flag_V = 0;
+    
+    reg[4] = 0x8000; 
+    dd.val = 0x8000;
+    dd.adr = 4;
+    dd.space = REGSPACE;
+
+    do_dec();
+
+    assert(reg[4] == 0x7FFF);
+    assert(flag_V == 1);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1685,21 +1999,42 @@ void test_decb(void) {
 void test_inc(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[4] = 0177;
+    //setup INCb
     byte_cmd = 1;
     flag_C = 1;
-    dd.val = 0177;
+    flag_N = 0; flag_Z = 1; flag_V = 0;
+    reg[4] = 0x7F; 
+    dd.val = 0x7F;
     dd.adr = 4;
     dd.space = REGSPACE;
 
     do_inc();
 
-    assert((reg[4] & 0377) == 0200);
+    assert((reg[4] & 0xFF) == 0x80); 
     assert(flag_V == 1);
     assert(flag_Z == 0);
     assert(flag_N == 1);
     assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
+    //setup INC
+    byte_cmd = 0;
+    flag_C = 0;
+    flag_N = 1; flag_Z = 1; flag_V = 0;
+    reg[4] = 0x7FFF; 
+    dd.val = 0x7FFF;
+    dd.adr = 4;
+    dd.space = REGSPACE;
+
+    do_inc();
+
+    assert(reg[4] == 0x8000);
+    assert(flag_V == 1);
+    assert(flag_Z == 0); 
+    assert(flag_N == 1);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1712,19 +2047,20 @@ void test_jmp(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    PC = 01000;
+    PC = 001000;
     reg[2] = 004000;
     dd.adr = 004000;
     dd.val = 0;
     dd.space = MEMSPACE;
+    flag_Z = 1; flag_N = 1; flag_C = 1; flag_V = 1;
 
     do_jmp();
 
     assert(PC == 004000);
-    assert(flag_Z == 0);
-    assert(flag_N == 0);
-    assert(flag_C == 0);
-    assert(flag_V == 0);
+    assert(flag_Z == 1);
+    assert(flag_N == 1);
+    assert(flag_C == 1);
+    assert(flag_V == 1);
 
     //clean
     reset_cpu_state();
@@ -1733,29 +2069,32 @@ void test_jmp(void) {
 }
 
 //тест на работу команды смены знака NEGb
-void test_negb(void) {
+void test_neg(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup положительное число
-    reg[3] = 004; 
+    //setup NEGb положительное число
     byte_cmd = 1;
-    flag_C = 0;
-    dd.val = 004;
+    reg[3] = 4; 
+    flag_C = 0; flag_V = 1; flag_N = 0; flag_Z = 1;
+    dd.val = 4;
     dd.adr = 3;
     dd.space = REGSPACE;
 
     do_neg();
 
-    assert(reg[3] == 0177774); 
+    assert(reg[3] == 0xFFFC); 
     assert(flag_Z == 0);
     assert(flag_N == 1);
     assert(flag_C == 1);
     assert(flag_V == 0);
 
-    //setup ноль
+    //clean
+    reset_cpu_state();
+
+    //setup NEG ноль
+    byte_cmd = 0;
     reg[3] = 0; 
-    byte_cmd = 1;
-    flag_C = 1;
+    flag_C = 1; flag_V = 1; flag_N = 1; flag_Z = 0;
     dd.val = 0;
     dd.adr = 3;
     dd.space = REGSPACE;
@@ -1771,6 +2110,26 @@ void test_negb(void) {
     //clean
     reset_cpu_state();
 
+    //проверка знакового переполнения
+    byte_cmd = 0;
+    flag_C = 0; flag_V = 0; flag_N = 0; flag_Z = 1;
+    
+    reg[3] = 0x8000; 
+    dd.val = 0x8000;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_neg();
+
+    assert(reg[3] == 0x8000); 
+    assert(flag_V == 1);
+    assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_C == 1);
+
+    //clean
+    reset_cpu_state();
+
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
@@ -1779,13 +2138,10 @@ void test_nop(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    PC = 01002;
+    PC = 001002;
     reg[1] = 42;
-    flag_N = 1; 
-    flag_C = 1; 
-    flag_Z = 0; 
-    flag_V = 0;
-    w_write(01000, 0000240, MEMSPACE);
+    flag_N = 1; flag_C = 1; flag_Z = 0; flag_V = 0;
+    w_write(001000, 0x00A0, MEMSPACE);
 
     do_clr_fl();
 
@@ -1806,12 +2162,9 @@ void test_reset(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    PC = 01002;
-    reg[5] = 77;
-    flag_Z = 1; 
-    flag_V = 1; 
-    flag_N = 0; 
-    flag_C = 0;
+    PC = 001002;
+    reg[5] = 77; 
+    flag_Z = 1; flag_V = 1; flag_N = 0; flag_C = 0;
 
     do_reset();
 
@@ -1827,23 +2180,48 @@ void test_reset(void) {
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
-//тест на работу циклического сдвига влево командой ROLb
-void test_rolb(void) {
+//тест на работу циклического сдвига влево командой ROL
+void test_rol(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[3] = 0200;
+    //setup ROLb
     byte_cmd = 1;
     flag_C = 0;
-    dd.val = 0200; 
+    flag_N = 1; flag_Z = 0; flag_V = 1;
+    
+    reg[3] = 0x80;
+    dd.val = 0x80; 
     dd.adr = 3; 
     dd.space = REGSPACE;
 
     do_rol();
 
-    assert((reg[3] & 0377) == 0);
+    assert((reg[3] & 0xFF) == 0);
     assert(flag_Z == 1);
     assert(flag_C == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 1);
+
+    //clean
+    reset_cpu_state();
+
+    //setup ROL
+    byte_cmd = 0;
+    flag_C = 1;
+    flag_N = 0; flag_Z = 1; flag_V = 1;
+    
+    reg[3] = 0x0000;
+    dd.val = 0x0000;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_rol();
+
+    assert(reg[3] == 1);
+    assert(flag_Z == 0);
+    assert(flag_C == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -1851,24 +2229,48 @@ void test_rolb(void) {
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
-//тест на работу циклического сдвига вправо командой ROLb
-void test_rorb(void) {
+//тест на работу циклического сдвига вправо командой ROL
+void test_ror(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[3] = 001;
+    //setup RORb
     byte_cmd = 1;
     flag_C = 1;
-
-    dd.val = 001; 
+    flag_N = 0; flag_Z = 1; flag_V = 1;
+    
+    reg[3] = 1;
+    dd.val = 1; 
     dd.adr = 3; 
     dd.space = REGSPACE;
 
     do_ror();
 
-    assert((reg[3] & 0377) == 0200);
+    assert((reg[3] & 0xFF) == 0x80);
     assert(flag_C == 1);
     assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    //setup ROR
+    byte_cmd = 0;
+    flag_C = 0;
+    flag_N = 1; flag_Z = 0; flag_V = 1;
+    
+    reg[3] = 0x8000;
+    dd.val = 0x8000;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_ror();
+
+    assert(reg[3] == 0x4000);
+    assert(flag_C == 0);
+    assert(flag_N == 0);
+    assert(flag_Z == 0);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -1876,41 +2278,69 @@ void test_rorb(void) {
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
-//тест на работу команды байтового вычитания переноса SBCb
-void test_sbcb(void) {
+//тест на работу команды вычитания переноса SBC
+void test_sbc(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup обычного вычитания переноса
-    reg[3] = 005;
+    //setup SBCb
     byte_cmd = 1;
     flag_C = 1;
-    dd.val = 005;
+    flag_N = 1; flag_Z = 1; flag_V = 1;
+    
+    reg[3] = 5;
+    dd.val = 5;
     dd.adr = 3;
     dd.space = REGSPACE;
 
     do_sbc();
 
-    assert(reg[3] == 004); 
+    assert((reg[3] & 0xFF) == 4);
     assert(flag_Z == 0);
     assert(flag_N == 0);
     assert(flag_C == 0);
     assert(flag_V == 0);
 
-    //setup вычитания из нуля
-    reg[3] = 000;
-    byte_cmd = 1;
+    //clean
+    reset_cpu_state();
+
+    //setup SBC
+    byte_cmd = 0;
     flag_C = 1;
-    dd.val = 000;
+    flag_N = 0; flag_Z = 1; flag_V = 1;
+    
+    reg[3] = 0;
+    dd.val = 0;
     dd.adr = 3;
     dd.space = REGSPACE;
 
     do_sbc();
 
-    assert(reg[3] == 0177777); 
-    assert(flag_Z == 0);
+    assert(reg[3] == 0xFFFF);
+    assert(flag_Z == 0); 
     assert(flag_N == 1);
     assert(flag_C == 1);
     assert(flag_V == 0);
+
+    //clean
+    reset_cpu_state();
+
+    //проверка знакового переполнения (V = 1)
+    byte_cmd = 0;
+    flag_C = 1;
+    flag_V = 0; flag_N = 0; flag_Z = 1;
+    
+    reg[3] = 0x8000; 
+    dd.val = 0x8000;
+    dd.adr = 3;
+    dd.space = REGSPACE;
+
+    do_sbc();
+
+    assert(reg[3] == 0x7FFF); 
+    assert(flag_V == 1);
+    assert(flag_N == 0);
+    assert(flag_Z == 0);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();
@@ -1923,14 +2353,11 @@ void test_set_flags(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup for all
-    PC = 01002; 
+    PC = 001002; 
 
     //setup SEC
-    flag_C = 0; 
-    flag_V = 0; 
-    flag_Z = 0; 
-    flag_N = 0;
-    w_write(01000, 0000261, MEMSPACE);
+    flag_C = 0; flag_V = 0; flag_Z = 0; flag_N = 0;
+    w_write(001000, 0x00B1, MEMSPACE);
 
     do_set_fl();
 
@@ -1940,11 +2367,8 @@ void test_set_flags(void) {
     assert(flag_N == 0);
 
     //setup SEV
-    flag_C = 0; 
-    flag_V = 0; 
-    flag_Z = 0; 
-    flag_N = 0;
-    w_write(01000, 0000262, MEMSPACE);
+    flag_C = 0; flag_V = 0; flag_Z = 0; flag_N = 0;
+    w_write(001000, 0x00B2, MEMSPACE);
 
     do_set_fl();
 
@@ -1954,11 +2378,8 @@ void test_set_flags(void) {
     assert(flag_N == 0);
 
     //setup SEZ
-    flag_C = 0; 
-    flag_V = 0; 
-    flag_Z = 0; 
-    flag_N = 0;
-    w_write(01000, 0000264, MEMSPACE);
+    flag_C = 0; flag_V = 0; flag_Z = 0; flag_N = 0;
+    w_write(001000, 0x00B4, MEMSPACE);
 
     do_set_fl();
 
@@ -1968,11 +2389,8 @@ void test_set_flags(void) {
     assert(flag_N == 0);
 
     //setup SEN
-    flag_C = 0; 
-    flag_V = 0; 
-    flag_Z = 0; 
-    flag_N = 0;
-    w_write(01000, 0000270, MEMSPACE);
+    flag_C = 0; flag_V = 0; flag_Z = 0; flag_N = 0;
+    w_write(001000, 0x00B8, MEMSPACE);
 
     do_set_fl();
 
@@ -1982,11 +2400,8 @@ void test_set_flags(void) {
     assert(flag_Z == 0);
 
     //setup SCC
-    flag_C = 0; 
-    flag_V = 0; 
-    flag_Z = 0; 
-    flag_N = 0;
-    w_write(01000, 0000277, MEMSPACE);
+    flag_C = 0; flag_V = 0; flag_Z = 0; flag_N = 0;
+    w_write(001000, 0x00BF, MEMSPACE);
 
     do_set_fl();
 
@@ -2005,10 +2420,11 @@ void test_set_flags(void) {
 void test_sub(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup обычное вычитание
-    reg[2] = 12;
+    //обычное вычитание (из большего меньшее)
     byte_cmd = 0;
-    flag_C = 0;
+    flag_N = 1; flag_Z = 1; flag_V = 1; flag_C = 1;
+
+    reg[2] = 12;
     ss.val = 5;
     dd.val = 12; 
     dd.adr = 2; 
@@ -2019,13 +2435,17 @@ void test_sub(void) {
     assert(reg[2] == 7); 
     assert(flag_Z == 0); 
     assert(flag_N == 0);
-    assert(flag_C == 0); 
+    assert(flag_C == 0);
     assert(flag_V == 0);
 
-    //setup из меньшего большее
-    reg[2] = 5;
+    //clean
+    reset_cpu_state();
+
+    //из меньшего большее
     byte_cmd = 0;
-    flag_C = 0;
+    flag_N = 0; flag_Z = 1; flag_V = 1; flag_C = 0;
+
+    reg[2] = 5;
     ss.val = 15;
     dd.val = 5; 
     dd.adr = 2; 
@@ -2033,7 +2453,7 @@ void test_sub(void) {
 
     do_sub();
 
-    assert(reg[2] == 0177766);
+    assert(reg[2] == 0xFFF6);
     assert(flag_Z == 0);
     assert(flag_N == 1);
     assert(flag_C == 1);
@@ -2050,15 +2470,14 @@ void test_swab(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup
-    Word test_val = 012345;
+    Word test_val = 0x14E5;
     Word expected_low = test_val & 0xFF;
     Word expected_high = (test_val >> 8) & 0xFF;
     Word expected_res = (expected_low << 8) | expected_high;
 
     reg[2] = test_val; 
     byte_cmd = 0;
-    flag_C = 1; 
-    flag_V = 1;
+    flag_Z = 1; flag_N = 1; flag_V = 1; flag_C = 1;
     dd.val = test_val;
     dd.adr = 2;
     dd.space = REGSPACE;
@@ -2066,7 +2485,7 @@ void test_swab(void) {
     do_swab();
 
     assert(reg[2] == expected_res);
-    assert(flag_Z == (expected_high == 0 ? 1 : 0));
+    assert(flag_Z == (expected_high == 0));
     assert(flag_N == ((expected_high >> 7) & 1));
     assert(flag_V == 0); 
     assert(flag_C == 0);
@@ -2082,36 +2501,39 @@ void test_sxt(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
     //setup N = 1
-    reg[2] = 0012345;
+    reg[2] = 0x14E5;
     byte_cmd = 0;
-    flag_N = 1;
-    flag_C = 1;
+    flag_N = 1; flag_C = 1; flag_V = 1;
     dd.val = 0;
     dd.adr = 2;
     dd.space = REGSPACE;
 
     do_sxt();
 
-    assert(reg[2] == 0177777);
+    assert(reg[2] == 0xFFFF);
     assert(flag_N == 1);
     assert(flag_Z == 0);
+    assert(flag_V == 0);
     assert(flag_C == 1);
 
+    //clean
+    reset_cpu_state();
+
     //setup N = 0
-    reg[2] = 0012345;
+    reg[2] = 0x14E5;
     byte_cmd = 0;
-    flag_N = 0;
-    flag_C = 1;
+    flag_N = 0; flag_C = 1; flag_V = 1;
     dd.val = 0;
     dd.adr = 2;
     dd.space = REGSPACE;
 
     do_sxt();
 
-    assert(reg[2] == 0000000);
+    assert(reg[2] == 0);
     assert(flag_N == 0);
     assert(flag_Z == 1);
     assert(flag_C == 1);
+    assert(flag_V == 0);
 
     //clean
     reset_cpu_state();
@@ -2123,38 +2545,44 @@ void test_sxt(void) {
 void test_xor(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    //setup
-    reg[2] = 0012345; 
-    reg[3] = 0005252;
+    //setup разных чисел
     byte_cmd = 0;
     r = 2;
-    flag_C = 1;
-    dd.val = 0005252;
+    flag_C = 1; flag_V = 1; flag_N = 1; flag_Z = 1;
+    
+    reg[2] = 0x14E5; 
+    reg[3] = 0x0A9A;
+    dd.val = 0x0A9A;
     dd.adr = 3;
     dd.space = REGSPACE;
 
     do_xor();
 
-    assert(reg[3] == 0017117);
-    assert(flag_Z == 0); 
+    assert(reg[3] == 0x1E7F);
+    assert(flag_Z == 0);
     assert(flag_N == 0);
     assert(flag_V == 0);
     assert(flag_C == 1);
 
-    //setup XOR одинаковых чисел
-    reg[2] = 0012345;
+    //clean
+    reset_cpu_state();
+
+    //setup одинаковых чисел
     byte_cmd = 0;
     r = 2;
-    flag_C = 1;
-    dd.val = 0012345;
+    flag_C = 1; flag_V = 1; flag_N = 1; flag_Z = 0;
+    
+    reg[2] = 0x14E5;
+    dd.val = 0x14E5;
     dd.adr = 2;
     dd.space = REGSPACE;
 
     do_xor();
 
-    assert(reg[2] == 0000000);
+    assert(reg[2] == 0);
     assert(flag_Z == 1);
     assert(flag_N == 0);
+    assert(flag_V == 0);
     assert(flag_C == 1);
 
     //clean
@@ -2171,6 +2599,7 @@ void test_mul(void) {
     reg[2] = 10;
     r = 2;
     dd.val = 64;
+    flag_Z = 1; flag_N = 1; flag_V = 1; flag_C = 1;
 
     do_mul();
 
@@ -2178,6 +2607,7 @@ void test_mul(void) {
     assert(reg[3] == 640);
     assert(flag_Z == 0);
     assert(flag_N == 0);
+    assert(flag_V == 0);
     assert(flag_C == 0);
 
     //clean
@@ -2194,6 +2624,7 @@ void test_div(void) {
     reg[3] = 2000;
     r = 2;
     dd.val = 2;
+    flag_Z = 1; flag_N = 1; flag_V = 1; flag_C = 1;
 
     do_div();
 

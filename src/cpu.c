@@ -391,16 +391,24 @@ void do_halt(void) {
 
 void do_mov(void) {
     if (byte_cmd) {
+        //MOVb
+        Byte b = (Byte)(ss.val & 0xFF);
+        Word expanded_res = (Word)((signed char)b);
+
         if (dd.space == REGSPACE) {
-            reg[dd.adr] = (signed char)(ss.val & 0xFF); //при записи в регистр расширяем знак до слова
+            w_write(dd.adr, expanded_res, REGSPACE); 
         } else {
-            b_write(dd.adr, (Byte)ss.val);  //записываем в ОЗУ
+            b_write(dd.adr, b);
         }
-    } else {
-        w_write(dd.adr, ss.val, dd.space); 
+        
+        set_flags_NZ(expanded_res);
+    } 
+    else {
+        //MOV
+        w_write(dd.adr, ss.val, dd.space);
+        set_flags_NZ(ss.val);
     }
-    //выставляем флаги условий PSW
-    set_flags_NZ(ss.val);
+
     flag_V = 0;
 }
 
