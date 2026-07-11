@@ -82,16 +82,18 @@ void w_write (Address adr, Word val, int space) {
                 return;
             }
 
-            if (is_new_line) {
-                printf("[PDP11 OUTPUT] ");
-                is_new_line = 0;
-            }
             if (byte_val == '\0' || byte_val == '\n') {
                 printf("\n");
                 fflush(stdout);
                 is_new_line = 1;
                 return;
             }
+
+            if (is_new_line) {
+                printf("[PDP11 OUTPUT] ");
+                is_new_line = 0;
+            }
+
             putchar(byte_val);
             fflush(stdout);
         }
@@ -103,8 +105,13 @@ void w_write (Address adr, Word val, int space) {
         return;
     }
 
-    assert((adr & 1) == 0);                         //проверка, что адрес слова четный
-    assert(adr < MEMSIZE - 1);                      //проверка, что адрес не выходит за границы памяти
+    //оригинальные системные коды ошибок DEC
+    if ((adr & 1) != 0) {
+        EMULATOR_EXIT(EXIT_MEM_ALIGNMENT, "Odd word address alignment at %06o (Trap Vector 4)", adr);
+    }
+    if (adr >= MEMSIZE - 1) {
+        EMULATOR_EXIT(EXIT_MEM_BOUNDS, "Address %06o out of memory bounds (Trap Vector 10)", adr);
+    }
 
     mem[adr] = (Byte)(val & 0xFF);                  //младший байт (остаток от деления на 256)   
     mem[adr + 1] = (Byte)((val >> 8) & 0xFF);       //старший байт (сдвиг на 8 бит вправо)
@@ -165,7 +172,7 @@ void load_file(const char * filename) {
 
     if (file_input == NULL) {      
         perror(filename);   
-        exit(errno);        
+        EMULATOR_EXIT(EXIT_FILE_UNKNOWN, "");        
     }
 
     int exit_code = load_data(file_input);
@@ -175,23 +182,28 @@ void load_file(const char * filename) {
     if (exit_code) {
         print_log(LOG_ERROR, "Error parsing file '%s'", filename);
         
+        ExitCode final_code;
+
         switch (exit_code) {
             case 1:
                 print_log(LOG_ERROR, "Unexpected end of file or data corruption");
+                final_code = EXIT_FILE_CORRUPTION;
                 break;
             case 2:
                 print_log(LOG_ERROR, "Invalid byte value detected");
+                final_code = EXIT_FILE_INVALID_VAL;
                 break;
             case 3:
                 print_log(LOG_ERROR, "Attempted write out of available memory bounds");
+                final_code = EXIT_FILE_MEM_BOUNDS;
                 break;
             default:
                 print_log(LOG_ERROR, "Unknown error (code %d)", exit_code);
+                final_code = EXIT_FILE_UNKNOWN;
                 break;
         }
 
-        exit(exit_code);
-
+        EMULATOR_EXIT(final_code, "");
     }
 
     print_log(LOG_INFO, "File loaded into memory successfully");

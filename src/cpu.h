@@ -1,8 +1,8 @@
 #ifndef CPU_H
 #define CPU_H
 
-//#include "config.h"
-//#include "logger.h"
+#include "config.h"
+#include "logger.h"
 
 #define SP reg[6]       //Stack Pointer (отдельно выделенный регистр R6)
 #define PC reg[7]       //Program Counter (отдельно выделенный регистр R7)
@@ -18,6 +18,14 @@
 #define HAS_XX      (1 << 5)  //32  (0100000) - XX (8 бит) - смещение для веток (биты 0-7)
 #define HAS_RLEFT   (1 << 6)  //64  (1000000) - R (3 бита) - регистр связи в битах 6-8 (XOR, MUL, DIV, ASH)
 #define HAS_RRIGHT  (1 << 7)  //128 (2000000) - R (3 бита) - регистр связи в битах 0-2 (RTS)
+
+#define EMULATOR_EXIT(code, message, ...) \
+    do { \
+        if ((message) != NULL && (message)[0] != '\0') { \
+            print_log(LOG_ERROR, "FATAL ERROR (Exit Code %d): " message, (code), ##__VA_ARGS__); \
+        } \
+        exit(code); \
+    } while (0)
 
 extern int output_print;    //переменная для беспрефиксного вывода stdout на дисплей
 
@@ -44,6 +52,22 @@ typedef struct {
     void (*do_command)(void);
     char params;
 } Command;
+
+//коды ошибок
+typedef enum {
+    EXIT_SUCCESS_HALT     = 0,  //процессор успешно остановлен командой HALT
+
+    //оригинальные трапы PDP-11 (DEC Standard)
+    EXIT_MEM_ALIGNMENT    = 4,  //трап по вектору 4: нечетный адрес (Bus Error)
+    EXIT_MEM_BOUNDS       = 10, //трап по вектору 10: reserved instruction / ошибка адресации
+
+    //cтандартные системные коды (POSIX/Unix)
+    EXIT_TEST_FAILED      = 1,  //сбой в юнит-тесте (CI/CD стандарт для Unix)
+    EXIT_FILE_CORRUPTION  = 11, //ошибка парсинга: повреждение данных в файле
+    EXIT_FILE_INVALID_VAL = 12, //ошибка парсинга: неверное значение байта
+    EXIT_FILE_MEM_BOUNDS  = 13, //ошибка парсинга: выход за границы ОЗУ при загрузке
+    EXIT_FILE_UNKNOWN     = 14  //ошибка файловой системы (не удалось открыть файл)
+} ExitCode;
 
 void reg_dump(void);                    //функция дампа регистров
 void run(void);                         //функция распознавания и запуска программ
