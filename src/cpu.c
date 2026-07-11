@@ -149,6 +149,7 @@ void run(void) {
     Word w;     //текущее слово, которое содержит команду
     
     while(1) {
+        timer_tick();                                   //вызываем обработчик таймера на каждом шаге цикла процессора
         w = w_read(PC);                                 //читаем текущее слово
         Address current_pc = PC;                        //сохраняем текущее значение РС для вывода в лог
         PC += 2;                                        //PC сразу же указывает на следующее неразобранное слово
@@ -1208,4 +1209,16 @@ void do_unknown(void) {
     Word w = w_read(PC - 2);
     print_log(LOG_ERROR, "Unknown instruction %06o at address %06o", w, PC - 2);
     exit(1);
+}
+
+void timer_tick(void) {
+    static int instruction_counter = 0;
+    
+    instruction_counter++;
+    
+    //"тик" каждые 1000 выполненных инструкций
+    if (instruction_counter >= 1000) {
+        timer_lks |= 0200;          //взводим 7-й бит готовности (LCM = 1)
+        instruction_counter = 0;    //сбрасываем счётчик инструкций
+    }
 }

@@ -12,13 +12,15 @@
 
 Byte mem[MEMSIZE];          //оперативная память
 
-#define OSTAT 0177564       //регистр состояния дисплея (флаг готовности)
-#define ODATA 0177566       //регистр данных дисплея (ASCII-код символа)
-#define RCSR  0177560       //регистр состояния приемника (клавиатуры)
-#define RBUF  0177562       //регистр данных приемника (ASCII-код нажатой клавиши)
+#define OSTAT   0177564     //регистр состояния дисплея (флаг готовности)
+#define ODATA   0177566     //регистр данных дисплея (ASCII-код символа)
+#define RCSR    0177560     //регистр состояния приемника (клавиатуры)
+#define RBUF    0177562     //регистр данных приемника (ASCII-код нажатой клавиши)
+#define LKS     0177546     //регистр состояния системного таймера (часов)
 
 Byte keyboard_rcsr = 0;     //флаг состояния клавиатуры (взводится 7-й бит при готовности)
 Byte keyboard_rbuf = 0;     //буфер хранения ASCII-кода нажатой клавиши
+Byte timer_lks = 0;         //флаг состояния регистра LKS системного таймера
 
 //функция проверяет, нажата ли клавиша в stdin без блокировки программы
 static int check_keyboard(void) {
@@ -64,6 +66,14 @@ void b_write (Address adr, Byte val) {
         return; 
     }
 
+    //запись в регистр состояния таймера LKS
+    if (adr == LKS) {
+        //программа может менять только 6-й бит (разрешение прерываний)
+        //7-й бит принудительно сбрасывается в 0
+        timer_lks = (val & 000100); 
+        return;
+    }
+
     //изолируем случайную запись в регистр OSTAT
     if (adr == OSTAT) {
         return; 
@@ -96,6 +106,13 @@ Byte b_read (Address adr) {
     if (adr == RBUF) {
         Byte val = keyboard_rbuf;
         keyboard_rcsr &= ~000200; //АППАРАТНЫЙ СБРОС: гасим Ready-флаг после чтения символа
+        return val;
+    }
+
+    //чтение регистра состояния таймера LKS
+    if (adr == LKS) {
+        Byte val = timer_lks;
+        timer_lks &= ~000200; // АППАРАТНЫЙ СБРОС: чтение регистра сбрасывает флаг готовности
         return val;
     }
 
@@ -139,6 +156,12 @@ void w_write (Address adr, Word val, int space) {
         return;
     }
 
+    //словесная запись в регистр таймера
+    if (adr == LKS) {
+        b_write(LKS, (Byte)(val & 0xFF));
+        return;
+    }
+
     //изолируем случайную запись в регистр OSTAT
     if (adr == OSTAT) {
         return;
@@ -170,6 +193,11 @@ Word w_read (Address a) {
     }
     if (a == RBUF) {
         return (Word)b_read(RBUF);
+    }
+
+    //словесное чтение таймера
+    if (a == LKS) {
+        return (Word)b_read(LKS);
     }
 
     Word w = mem[a + 1];

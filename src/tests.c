@@ -71,7 +71,8 @@ typedef enum {
     TEST_XOR            = 53,
     TEST_MUL            = 54,
     TEST_DIV            = 55,
-    TEST_KEYBOARD       = 56
+    TEST_KEYBOARD       = 56,
+    TEST_TIMER          = 57
 } TestID;
 
 typedef struct {
@@ -136,8 +137,8 @@ static const TestCase test_table[] = {
     {TEST_XOR,              "test_xor",                 test_xor},
     {TEST_MUL,              "test_mul",                 test_mul},
     {TEST_DIV,              "test_div",                 test_div},
-    {TEST_KEYBOARD,         "test_keyboard",            test_keyboard}
-
+    {TEST_KEYBOARD,         "test_keyboard",            test_keyboard},
+    {TEST_TIMER,            "test_timer",               test_timer}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -220,6 +221,7 @@ void run_test_by_id(int id) {
         case TEST_MUL           :   test_mul();                     break;
         case TEST_DIV           :   test_div();                     break;
         case TEST_KEYBOARD      :   test_keyboard();                break;
+        case TEST_TIMER         :   test_timer();                   break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -2664,7 +2666,7 @@ void test_keyboard(void) {
     Byte rcsr_ready = b_read(0177560);
     assert((rcsr_ready & 0200) != 0);
 
-    //xитаем символ из RBUF
+    //читаем символ из RBUF
     Byte read_symbol = b_read(0177562);
     assert(read_symbol == 'A');
 
@@ -2684,6 +2686,55 @@ void test_keyboard(void) {
 
     Word w_rcsr_after = w_read(0177560);
     assert((w_rcsr_after & 0200) == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест для проверки таймера
+void test_timer(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+    
+    reset_cpu_state();
+    
+    //setup b_read
+    timer_lks = 0;
+    Byte lks_init = b_read(0177546); //LKS
+    assert((lks_init & 000200) == 0);
+
+    //симулируем выполнение 999 инструкций — таймер должен молчать
+    for (int i = 0; i < 999; i++) {
+        timer_tick();
+    }
+    Byte lks_999 = b_read(0177546);
+    assert((lks_999 & 0200) == 0);
+
+    //1000-й
+    timer_tick();
+    
+    //LKS аппаратно зажёгся 7-й бит готовности (000200)
+    Byte lks_tick = b_read(0177546);
+    assert((lks_tick & 000200) != 0);
+
+    //АППАРАТНАЯ ПРОВЕРКА: так как на прошлом шаге мы вызвали b_read(LKS),
+    //флаг готовности обязан автоматически погаснуть! Проверяем повторным чтением:
+    Byte lks_after_read = b_read(0177546);
+    assert((lks_after_read & 0200) == 0);
+
+    //setup w_read
+    for (int i = 0; i < 1000; i++) {
+        timer_tick();
+    }
+    
+    //флаг готовности взведен
+    Word w_lks = w_read(0177546);
+    assert((w_lks & 0200) != 0);
+
+    //после чтения w_read флаг обязан автоматически сброситься в ноль
+    Word w_lks_after = w_read(0177546);
+    assert((w_lks_after & 0200) == 0);
 
     //clean
     reset_cpu_state();

@@ -38,6 +38,8 @@ extern int flag_C;  //Carry    (перенос из старшего разря�
 extern int byte_cmd;
 extern int xx;
 
+extern Byte timer_lks;
+
 typedef struct {
     Word val;       //значение операнда
     Address adr;    //адрес операнда
@@ -142,5 +144,6 @@ void do_halt(void);     // HALT   [000000] NZVC=---- | Останов проце
 
 //служебные
 void do_unknown(void);  // DU [------] NZVC=---- | Заглушка нереализованных зон дешифратора опкодов
+void timer_tick(void);  // функция обработки тика таймера
 
 #endif
