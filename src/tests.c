@@ -72,7 +72,8 @@ typedef enum {
     TEST_MUL            = 54,
     TEST_DIV            = 55,
     TEST_KEYBOARD       = 56,
-    TEST_TIMER          = 57
+    TEST_TIMER          = 57,
+    TEST_INTERRUPT      = 58
 } TestID;
 
 typedef struct {
@@ -138,7 +139,8 @@ static const TestCase test_table[] = {
     {TEST_MUL,              "test_mul",                 test_mul},
     {TEST_DIV,              "test_div",                 test_div},
     {TEST_KEYBOARD,         "test_keyboard",            test_keyboard},
-    {TEST_TIMER,            "test_timer",               test_timer}
+    {TEST_TIMER,            "test_timer",               test_timer},
+    {TEST_INTERRUPT,        "test_interrupt",           test_interrupt}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -222,6 +224,7 @@ void run_test_by_id(int id) {
         case TEST_DIV           :   test_div();                     break;
         case TEST_KEYBOARD      :   test_keyboard();                break;
         case TEST_TIMER         :   test_timer();                   break;
+        case TEST_INTERRUPT     :   test_interrupt();               break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -2735,6 +2738,65 @@ void test_timer(void) {
     //после чтения w_read флаг обязан автоматически сброситься в ноль
     Word w_lks_after = w_read(0177546);
     assert((w_lks_after & 0200) == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест для проверки аппаратных прерываний
+void test_interrupt(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+    
+    reset_cpu_state();
+    
+    //setup
+    SP = 003000;
+    PC = 001000;
+    w_write(000100, 002000, MEMSPACE);
+    w_write(000102, 000000, MEMSPACE);
+    w_write(002000, 0000002, MEMSPACE);
+    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 0;
+    timer_lks = 0100;
+
+    //cимулируем выполнение 1000 инструкций, чтобы таймер сделал тик
+    for (int i = 0; i < 1000; i++) {
+        timer_tick();
+    }
+    
+    //проверка флага таймера готовности
+    assert(timer_lks == 0300);
+
+    //вызываем обработчик прерываний
+    interrupts();
+
+    assert(PC == 002000);          //PC теперь указывает на вектор прерывания 002000
+    assert(timer_lks == 0100);     //7-й бит готовности в LKS автоматически сбросился
+    assert(SP == 002774);          //стек вырос вниз на два слова (-4 байта)
+
+    //проверка что лежит в стеке
+    Word saved_pc = w_read(SP);
+    assert(saved_pc == 001000);
+    Word saved_psw = w_read(SP + 2);
+    assert((saved_psw & 010) != 0);
+    assert((saved_psw & 002) != 0);
+
+    assert(flag_N == 0 && flag_Z == 0 && flag_V == 0 && flag_C == 0);
+
+    //RTI
+    Word current_opcode = w_read(PC);
+    assert(current_opcode == 0000002);
+    PC += 2; 
+
+    do_rti();
+
+    assert(PC == 001000);
+    assert(SP == 003000);
+    assert(flag_N == 1);
+    assert(flag_Z == 0);
+    assert(flag_V == 1);
+    assert(flag_C == 0);
 
     //clean
     reset_cpu_state();

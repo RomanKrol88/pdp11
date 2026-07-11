@@ -81,6 +81,7 @@ Command command[] = {   //таблица команд
     {0177700, 0005700,  "tst",      do_tst,     HAS_DD},
     {0177700, 0105700,  "tstb",     do_tst,     HAS_DD},
     {0177000, 0074000,  "xor",      do_xor,     HAS_RLEFT | HAS_DD},
+    {0177777, 0000002,  "rti",      do_rti,     NO_PARAMS},
     {0000000, 0000000,  "unknown",  do_unknown, NO_PARAMS}
 };
 
@@ -154,6 +155,8 @@ void run(void) {
         Address current_pc = PC;                        //сохраняем текущее значение РС для вывода в лог
         PC += 2;                                        //PC сразу же указывает на следующее неразобранное слово
         Command cmd = parse_cmd(w);                     //декодируем считанное слово
+
+        interrupts();                                   //проверяем, нет ли запроса от периферии на прерывание
 
         //печатаем лог в стиле MACRO-11
         if (strcmp(cmd.name, "unknown") == 0) {
@@ -369,6 +372,54 @@ void set_flag_C(DWord val) {
     } else {
         //для слова перенос возникает, если результат вышел за пределы 16 бит (17-й бит взведен)
         flag_C = (val >> 16) & 1; 
+    }
+}
+
+void timer_tick(void) {
+    static int instruction_counter = 0;
+    
+    instruction_counter++;
+    
+    //"тик" каждые 1000 выполненных инструкций
+    if (instruction_counter >= 1000) {
+        timer_lks |= 0200;          //взводим 7-й бит готовности (LCM = 1)
+        instruction_counter = 0;    //сбрасываем счётчик инструкций
+    }
+}
+
+Word get_psw(void) {
+    Word psw = 0;
+    if (flag_N) psw |= 010; // 3-й бит
+    if (flag_Z) psw |= 004; // 2-й бит
+    if (flag_V) psw |= 002; // 1-й бит
+    if (flag_C) psw |= 001; // 0-й бит
+    return psw;
+}
+
+void interrupts(void) {
+    //условие прерывания таймера: взведены и флаг тика (0200) и разрешение прерываний (0100)
+    if ((timer_lks & 0300) == 0300) {
+        
+        timer_lks &= ~0200; 
+        
+        //записываем текущие флаги PSW
+        SP -= 2;
+        w_write(SP, get_psw(), MEMSPACE);
+        
+        //записываем текущий PC
+        SP -= 2;
+        w_write(SP, PC, MEMSPACE);
+        
+        //загружаем новый PC из вектора прерывания таймера (адрес 000100)
+        PC = w_read(000100);
+        
+        //сбрасываем флаги
+        flag_N = 0;
+        flag_Z = 0;
+        flag_V = 0;
+        flag_C = 0;
+        
+        print_log(LOG_TRACE, ">>> INTERRUPT: Timer triggered! Vector 0100 loaded. New PC: %06o", PC);
     }
 }
 
@@ -1205,20 +1256,25 @@ void do_div(void) {
     flag_C = 0;
 }
 
+void do_rti(void) {
+    //возврат PC из стека
+    PC = w_read(SP);
+    SP += 2;
+    
+    //возврат PSW из стека и восстановление флагов
+    Word old_psw = w_read(SP);
+    SP += 2;
+    
+    flag_N = (old_psw & 010) ? 1 : 0;
+    flag_Z = (old_psw & 004) ? 1 : 0;
+    flag_V = (old_psw & 002) ? 1 : 0;
+    flag_C = (old_psw & 001) ? 1 : 0;
+    
+    print_log(LOG_TRACE, ">>> RTI: Returned from interrupt. Restored PC: %06o", PC);
+}
+
 void do_unknown(void) {
     Word w = w_read(PC - 2);
     print_log(LOG_ERROR, "Unknown instruction %06o at address %06o", w, PC - 2);
     exit(1);
-}
-
-void timer_tick(void) {
-    static int instruction_counter = 0;
-    
-    instruction_counter++;
-    
-    //"тик" каждые 1000 выполненных инструкций
-    if (instruction_counter >= 1000) {
-        timer_lks |= 0200;          //взводим 7-й бит готовности (LCM = 1)
-        instruction_counter = 0;    //сбрасываем счётчик инструкций
-    }
 }

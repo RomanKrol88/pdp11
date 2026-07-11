@@ -73,5 +73,6 @@ void test_flags_add_overflow(void);         //тест в ADD на V = 1 и N = 
 //6. Юнит-тесты для проверки работы исполняемых модулей
 void test_keyboard(void);                   //тест для проверки ввода символов с клавиатуры
 void test_timer(void);                      //тест для проверки таймера
+void test_interrupt(void);                  //тест для проверки аппаратных прерываний
 
 #endif
