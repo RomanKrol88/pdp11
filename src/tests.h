@@ -70,4 +70,7 @@ void test_flags_mov_negative(void);         //тест в MOV на флаг N = 
 void test_flags_add_carry(void);            //тест в ADD на C = 1 и Z = 1, остальные 0
 void test_flags_add_overflow(void);         //тест в ADD на V = 1 и N = 1, остальные 0
 
+//6. Юнит-тесты для проверки работы исполняемых модулей
+void test_keyboard(void);                   //тест для проверки ввода символов с клавиатуры
+
 #endif

@@ -6,11 +6,28 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <sys/select.h>
+#include <unistd.h>
+#include <termios.h>
 
 Byte mem[MEMSIZE];          //оперативная память
 
 #define OSTAT 0177564       //регистр состояния дисплея (флаг готовности)
 #define ODATA 0177566       //регистр данных дисплея (ASCII-код символа)
+#define RCSR  0177560       //регистр состояния приемника (клавиатуры)
+#define RBUF  0177562       //регистр данных приемника (ASCII-код нажатой клавиши)
+
+Byte keyboard_rcsr = 0;     //флаг состояния клавиатуры (взводится 7-й бит при готовности)
+Byte keyboard_rbuf = 0;     //буфер хранения ASCII-кода нажатой клавиши
+
+//функция проверяет, нажата ли клавиша в stdin без блокировки программы
+static int check_keyboard(void) {
+    struct timeval tv = {0, 0};
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
+}
 
 static int load_data(FILE * file);      //функция читает данные из файла и записывает в память (возвращает код ошибки или 0, если прочитано без ошибок)
 
@@ -28,7 +45,7 @@ void b_write (Address adr, Byte val) {
                 return;
             }
 
-            if (is_new_line) {
+            if (is_new_line && !output_print) {
                 printf("[PDP11 OUTPUT] ");
                 is_new_line = 0;
             }
@@ -57,7 +74,29 @@ void b_write (Address adr, Byte val) {
 
 Byte b_read (Address adr) {
     if (adr == OSTAT) {
-        return 0200; 
+        return 000200; 
+    }
+
+    //чтение регистра состояния клавиатуры RCSR
+    if (adr == RCSR) {
+        //если бит готовности еще не взведен, проверяем реальную клавиатуру Linux
+        if ((keyboard_rcsr & 000200) == 0) {
+            if (check_keyboard()) {
+                char c;
+                if (read(STDIN_FILENO, &c, 1) > 0) {
+                    keyboard_rbuf = (Byte)c;
+                    keyboard_rcsr |= 000200; //взводим 7-й бит готовности (Ready = 1)
+                }
+            }
+        }
+        return keyboard_rcsr;
+    }
+
+    //чтение регистра данных клавиатуры RBUF
+    if (adr == RBUF) {
+        Byte val = keyboard_rbuf;
+        keyboard_rcsr &= ~000200; //АППАРАТНЫЙ СБРОС: гасим Ready-флаг после чтения символа
+        return val;
     }
 
     return mem[adr];
@@ -89,7 +128,7 @@ void w_write (Address adr, Word val, int space) {
                 return;
             }
 
-            if (is_new_line) {
+            if (is_new_line && !output_print) {
                 printf("[PDP11 OUTPUT] ");
                 is_new_line = 0;
             }
@@ -118,11 +157,19 @@ void w_write (Address adr, Word val, int space) {
 }
 
 Word w_read (Address a) {
-    assert((a & 1) == 0);                         //проверка, что адрес слова четный
-    assert(a < MEMSIZE - 1);                      //проверка, что адрес не выходит за границы памяти
+    assert((a & 1) == 0);       //проверка, что адрес слова четный
+    assert(a < MEMSIZE - 1);    //проверка, что адрес не выходит за границы памяти
 
     if (a == OSTAT) {
         return 0200;
+    }
+
+    //чтение клавиатуры по словесному адресу (младший байт слова совпадает с адресом регистра)
+    if (a == RCSR) {
+        return (Word)b_read(RCSR);
+    }
+    if (a == RBUF) {
+        return (Word)b_read(RBUF);
     }
 
     Word w = mem[a + 1];

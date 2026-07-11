@@ -12,6 +12,8 @@ extern Byte mem[MEMSIZE];
 extern Word reg[REGSIZE];
 extern Arg ss, dd;
 extern int r, nn, xx;
+extern Byte keyboard_rcsr;
+extern Byte keyboard_rbuf;
 
 typedef enum {
     TEST_MEM            =  1,
@@ -68,7 +70,8 @@ typedef enum {
     TEST_SXT            = 52,
     TEST_XOR            = 53,
     TEST_MUL            = 54,
-    TEST_DIV            = 55
+    TEST_DIV            = 55,
+    TEST_KEYBOARD       = 56
 } TestID;
 
 typedef struct {
@@ -133,6 +136,7 @@ static const TestCase test_table[] = {
     {TEST_XOR,              "test_xor",                 test_xor},
     {TEST_MUL,              "test_mul",                 test_mul},
     {TEST_DIV,              "test_div",                 test_div},
+    {TEST_KEYBOARD,         "test_keyboard",            test_keyboard}
 
 };
 
@@ -215,6 +219,7 @@ void run_test_by_id(int id) {
         case TEST_XOR           :   test_xor();                     break;
         case TEST_MUL           :   test_mul();                     break;
         case TEST_DIV           :   test_div();                     break;
+        case TEST_KEYBOARD      :   test_keyboard();                break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -2634,6 +2639,51 @@ void test_div(void) {
     assert(flag_N == 0);
     assert(flag_V == 0);
     assert(flag_C == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест для проверки ввода символов с клавиатуры
+void test_keyboard(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+    
+    reset_cpu_state();
+    
+    //setup b_read
+    keyboard_rcsr = 0;
+    keyboard_rbuf = 0;
+    Byte rcsr_init = b_read(0177560); //RCSR
+    assert((rcsr_init & 0200) == 0);
+
+    //cимулируем «нажатие» клавиши: кладём в буфер символ 'A' и взводим Ready-флаг (0200)
+    keyboard_rbuf = 'A';
+    keyboard_rcsr |= 0200;
+    Byte rcsr_ready = b_read(0177560);
+    assert((rcsr_ready & 0200) != 0);
+
+    //xитаем символ из RBUF
+    Byte read_symbol = b_read(0177562);
+    assert(read_symbol == 'A');
+
+    //АППАРАТНАЯ ПРОВЕРКА: после чтения из RBUF флаг в RCSR обязан автоматически сброситься
+    Byte rcsr_after_read = b_read(0177560);
+    assert((rcsr_after_read & 0200) == 0);
+
+    //setup w_read
+    keyboard_rbuf = 'Z';
+    keyboard_rcsr |= 0200;
+
+    Word w_rcsr = w_read(0177560);
+    assert((w_rcsr & 0200) != 0);
+
+    Word w_rbuf = w_read(0177562);
+    assert((w_rbuf & 0xFF) == 'Z');
+
+    Word w_rcsr_after = w_read(0177560);
+    assert((w_rcsr_after & 0200) == 0);
 
     //clean
     reset_cpu_state();

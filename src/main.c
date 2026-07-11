@@ -1,3 +1,4 @@
+#include "config.h"
 #include "memory.h"
 #include "logger.h"
 #include "cpu.h"
