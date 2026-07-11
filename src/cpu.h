@@ -39,6 +39,7 @@ extern int byte_cmd;
 extern int xx;
 
 extern Byte timer_lks;
+extern Byte keyboard_rcsr;
 
 typedef struct {
     Word val;       //значение операнда
@@ -147,6 +148,8 @@ void do_halt(void);     // HALT   [000000] NZVC=---- | Останов проце
 
 //служебные
 void do_rti(void);      // RTI    [000002] NZVC=vvvv | Возврат из обработчика прерывания через стек
+void do_emt(void);      // EMT    [104000] NZVC=0000 | Программный трап эмулятора по вектору 000030
+void do_trap(void);     // TRAP   [104400] NZVC=0000 | Программный пользовательский трап по вектору 000034
 void do_unknown(void);  // DU     [------] NZVC=---- | Заглушка нереализованных зон дешифратора опкодов
 
 #endif

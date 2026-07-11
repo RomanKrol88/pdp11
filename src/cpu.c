@@ -50,6 +50,7 @@ Command command[] = {   //таблица команд
     {0177700, 0005300,  "dec",      do_dec,     HAS_DD},
     {0177700, 0105300,  "decb",     do_dec,     HAS_DD},
     {0177000, 0071000,  "div",      do_div,     HAS_RLEFT | HAS_DD},
+    {0177400, 0104000,  "emt",      do_emt,     NO_PARAMS},
     {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
     {0177700, 0005200,  "inc",      do_inc,     HAS_DD},
     {0177700, 0105200,  "incb",     do_inc,     HAS_DD},
@@ -66,6 +67,7 @@ Command command[] = {   //таблица команд
     {0177700, 0106100,  "rolb",     do_rol,     HAS_DD},
     {0177700, 0006000,  "ror",      do_ror,     HAS_DD},
     {0177700, 0106000,  "rorb",     do_ror,     HAS_DD},
+    {0177777, 0000002,  "rti",      do_rti,     NO_PARAMS},
     {0177770, 0000200,  "rts",      do_rts,     HAS_RRIGHT},
     {0177700, 0005600,  "sbc",      do_sbc,     HAS_DD},
     {0177700, 0105600,  "sbcb",     do_sbc,     HAS_DD},
@@ -80,8 +82,8 @@ Command command[] = {   //таблица команд
     {0177700, 0006700,  "sxt",      do_sxt,     HAS_DD},
     {0177700, 0005700,  "tst",      do_tst,     HAS_DD},
     {0177700, 0105700,  "tstb",     do_tst,     HAS_DD},
-    {0177000, 0074000,  "xor",      do_xor,     HAS_RLEFT | HAS_DD},
-    {0177777, 0000002,  "rti",      do_rti,     NO_PARAMS},
+    {0177400, 0104400,  "trap",     do_trap,    NO_PARAMS},
+    {0177000, 0074000,  "xor",      do_xor,     HAS_RLEFT | HAS_DD},    
     {0000000, 0000000,  "unknown",  do_unknown, NO_PARAMS}
 };
 
@@ -382,42 +384,52 @@ void timer_tick(void) {
     
     //"тик" каждые 1000 выполненных инструкций
     if (instruction_counter >= 1000) {
-        timer_lks |= 0200;          //взводим 7-й бит готовности (LCM = 1)
+        timer_lks |= 000200;          //взводим 7-й бит готовности (LCM = 1)
         instruction_counter = 0;    //сбрасываем счётчик инструкций
     }
 }
 
 Word get_psw(void) {
     Word psw = 0;
-    if (flag_N) psw |= 010; // 3-й бит
-    if (flag_Z) psw |= 004; // 2-й бит
-    if (flag_V) psw |= 002; // 1-й бит
-    if (flag_C) psw |= 001; // 0-й бит
+    if (flag_N) psw |= 000010; // 3-й бит
+    if (flag_Z) psw |= 000004; // 2-й бит
+    if (flag_V) psw |= 000002; // 1-й бит
+    if (flag_C) psw |= 000001; // 0-й бит
     return psw;
 }
 
 void interrupts(void) {
-    //условие прерывания таймера: взведены и флаг тика (0200) и разрешение прерываний (0100)
-    if ((timer_lks & 0300) == 0300) {
+    //условие прерывания клавиатуры: взведены и Ready (0200), и Interrupt Enable (0100)
+    if ((keyboard_rcsr & 000300) == 000300) {
         
-        timer_lks &= ~0200; 
-        
-        //записываем текущие флаги PSW
+        keyboard_rcsr &= ~000200;
+
         SP -= 2;
         w_write(SP, get_psw(), MEMSPACE);
-        
-        //записываем текущий PC
         SP -= 2;
         w_write(SP, PC, MEMSPACE);
         
-        //загружаем новый PC из вектора прерывания таймера (адрес 000100)
+        PC = w_read(000060);
+        
+        flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
+        
+        print_log(LOG_TRACE, ">>> INTERRUPT: Keyboard triggered! Vector 0060 loaded. New PC: %06o", PC);
+        return;
+    }
+
+    //условие прерывания таймера: взведены и флаг тика (0200) и разрешение прерываний (0100)
+    if ((timer_lks & 0300) == 0300) {
+        timer_lks &= ~0200; 
+        
+        SP -= 2;
+        w_write(SP, get_psw(), MEMSPACE);
+        
+        SP -= 2;
+        w_write(SP, PC, MEMSPACE);
+        
         PC = w_read(000100);
         
-        //сбрасываем флаги
-        flag_N = 0;
-        flag_Z = 0;
-        flag_V = 0;
-        flag_C = 0;
+        flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
         
         print_log(LOG_TRACE, ">>> INTERRUPT: Timer triggered! Vector 0100 loaded. New PC: %06o", PC);
     }
@@ -1271,6 +1283,42 @@ void do_rti(void) {
     flag_C = (old_psw & 001) ? 1 : 0;
     
     print_log(LOG_TRACE, ">>> RTI: Returned from interrupt. Restored PC: %06o", PC);
+}
+
+void do_emt(void) {
+    //запись текущего PSW в стек
+    SP -= 2;
+    w_write(SP, get_psw(), MEMSPACE);
+    
+    //запись текущего РС в стек
+    SP -= 2;
+    w_write(SP, PC, MEMSPACE);
+    
+    //загружаем новый PC из вектора EMT (000030)
+    PC = w_read(000030);
+    
+    //сброс флагов
+    flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
+    
+    print_log(LOG_TRACE, ">>> TRAP: EMT triggered! Vector 0030 loaded. New PC: %06o", PC);
+}
+
+void do_trap(void) {
+    //запись текущего PSW в стек
+    SP -= 2;
+    w_write(SP, get_psw(), MEMSPACE);
+    
+    //запись текущего РС в стек
+    SP -= 2;
+    w_write(SP, PC, MEMSPACE);
+    
+    //загружаем новый PC из вектора TRAP (000034)
+    PC = w_read(000034);
+    
+    //сброс флагов
+    flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
+    
+    print_log(LOG_TRACE, ">>> TRAP: TRAP instruction triggered! Vector 0034 loaded. New PC: %06o", PC);
 }
 
 void do_unknown(void) {

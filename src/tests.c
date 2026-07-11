@@ -73,7 +73,9 @@ typedef enum {
     TEST_DIV            = 55,
     TEST_KEYBOARD       = 56,
     TEST_TIMER          = 57,
-    TEST_INTERRUPT      = 58
+    TEST_INTERRUPT      = 58,
+    TEST_KEYB_INT       = 59,
+    TEST_SYS_TRAPS      = 60
 } TestID;
 
 typedef struct {
@@ -140,7 +142,9 @@ static const TestCase test_table[] = {
     {TEST_DIV,              "test_div",                 test_div},
     {TEST_KEYBOARD,         "test_keyboard",            test_keyboard},
     {TEST_TIMER,            "test_timer",               test_timer},
-    {TEST_INTERRUPT,        "test_interrupt",           test_interrupt}
+    {TEST_INTERRUPT,        "test_interrupt",           test_interrupt},
+    {TEST_KEYB_INT,         "test_keyboard_interrupt",  test_keyboard_interrupt},
+    {TEST_SYS_TRAPS,        "test_sys_traps",           test_sys_traps}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -225,6 +229,8 @@ void run_test_by_id(int id) {
         case TEST_KEYBOARD      :   test_keyboard();                break;
         case TEST_TIMER         :   test_timer();                   break;
         case TEST_INTERRUPT     :   test_interrupt();               break;
+        case TEST_KEYB_INT      :   test_keyboard_interrupt();      break;
+        case TEST_SYS_TRAPS     :   test_sys_traps();               break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -2745,7 +2751,7 @@ void test_timer(void) {
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
 
-//тест для проверки аппаратных прерываний
+//тест для проверки аппаратных прерываний TRAP 0100
 void test_interrupt(void) {
     print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
     
@@ -2797,6 +2803,115 @@ void test_interrupt(void) {
     assert(flag_Z == 0);
     assert(flag_V == 1);
     assert(flag_C == 0);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест для проверки аппаратных прерываний клавиатуры TRAP 0060
+void test_keyboard_interrupt(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+    
+    reset_cpu_state();
+    
+    //setup
+    SP = 003000; 
+    PC = 001000; 
+
+    w_write(000060, 004000, MEMSPACE);
+    w_write(000062, 000000, MEMSPACE);
+    w_write(004000, 0000002, MEMSPACE);
+
+    //проверяем пассивный режим: прилетела клавиша 'B', но прерывания клавиатуры ЗАПРЕЩЕНЫ (IE = 0)
+    keyboard_rcsr = 000000; // IE = 0
+    keyboard_rbuf = 'B';
+    keyboard_rcsr |= 000200; // Ready = 1
+
+    interrupts();
+    assert(PC == 001000); // PC не изменился
+
+    //активный режим: разрешаем прерывания клавиатуры (IE = 0100)
+    keyboard_rcsr = 000100; // Включаем 6-й бит
+    
+    //имитация нажатия клавиши
+    keyboard_rcsr |= 000200; 
+    assert(keyboard_rcsr == 000300);
+
+    interrupts();
+
+    assert(PC == 004000);
+    assert(keyboard_rcsr == 000100);\
+    assert(SP == 002774);
+
+    //RTI
+    PC += 2;
+    do_rti();
+
+    assert(PC == 001000);
+    assert(SP == 003000);
+
+    //clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест для проверки программных прерываний по векторам 0030 (EMT) и 0034 (TRAP)
+void test_sys_traps(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+    
+    reset_cpu_state();
+    
+    SP = 003000; 
+    
+    //setup EMT
+    PC = 001000; 
+    w_write(000030, 005000, MEMSPACE);
+    w_write(000032, 000000, MEMSPACE);
+    w_write(005000, 0000002, MEMSPACE);
+    flag_Z = 1;
+
+    PC += 2;
+    do_emt();
+
+    assert(PC == 005000);
+    assert(SP == 002774);
+    assert(flag_Z == 0);
+
+    PC += 2;
+    do_rti();
+    
+    assert(PC == 001002);
+    assert(SP == 003000);
+    assert(flag_Z == 1);
+
+    //clean
+    reset_cpu_state();
+
+    //setup TRAP
+    SP = 003000;
+    PC = 001100;
+
+    w_write(000034, 006000, MEMSPACE);
+    w_write(000036, 000000, MEMSPACE);
+    w_write(006000, 0000002, MEMSPACE);
+    flag_C = 1;
+
+    PC += 2;
+    do_trap();
+
+    assert(PC == 006000);
+    assert(SP == 002774);
+    assert(flag_C == 0);
+
+    PC += 2;
+    do_rti();
+
+    assert(PC == 001102);
+    assert(SP == 003000);
+    assert(flag_C == 1);
 
     //clean
     reset_cpu_state();

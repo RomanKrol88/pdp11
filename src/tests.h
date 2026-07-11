@@ -73,6 +73,8 @@ void test_flags_add_overflow(void);         //тест в ADD на V = 1 и N = 
 //6. Юнит-тесты для проверки работы исполняемых модулей
 void test_keyboard(void);                   //тест для проверки ввода символов с клавиатуры
 void test_timer(void);                      //тест для проверки таймера
-void test_interrupt(void);                  //тест для проверки аппаратных прерываний
+void test_interrupt(void);                  //тест для проверки аппаратных прерываний TRAP 0100
+void test_keyboard_interrupt(void);         //тест для проверки аппаратных прерываний клавиатуры TRAP 0060
+void test_sys_traps(void);                  //тест для проверки программных прерываний по векторам 0030 (EMT) и 0034 (TRAP)
 
 #endif
