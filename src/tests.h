@@ -76,5 +76,6 @@ void test_timer(void);                      //тест для проверки �
 void test_interrupt(void);                  //тест для проверки аппаратных прерываний TRAP 0100
 void test_keyboard_interrupt(void);         //тест для проверки аппаратных прерываний клавиатуры TRAP 0060
 void test_sys_traps(void);                  //тест для проверки программных прерываний по векторам 0030 (EMT) и 0034 (TRAP)
+void test_rk11_disk(void);                  //тест для проверки чтения секторов из бинарного образа диска rt11sj.dsk RK11 DMA
 
 #endif

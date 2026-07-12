@@ -14,6 +14,12 @@ extern Arg ss, dd;
 extern int r, nn, xx;
 extern Byte keyboard_rcsr;
 extern Byte keyboard_rbuf;
+extern Word rk11_rkds;
+extern Word rk11_rker;
+extern Word rk11_rkcs;
+extern Word rk11_rkwc;
+extern Word rk11_rkba;
+extern Word rk11_rkda;
 
 typedef enum {
     TEST_MEM            =  1,
@@ -75,7 +81,8 @@ typedef enum {
     TEST_TIMER          = 57,
     TEST_INTERRUPT      = 58,
     TEST_KEYB_INT       = 59,
-    TEST_SYS_TRAPS      = 60
+    TEST_SYS_TRAPS      = 60,
+    TEST_RK11           = 61
 } TestID;
 
 typedef struct {
@@ -144,7 +151,8 @@ static const TestCase test_table[] = {
     {TEST_TIMER,            "test_timer",               test_timer},
     {TEST_INTERRUPT,        "test_interrupt",           test_interrupt},
     {TEST_KEYB_INT,         "test_keyboard_interrupt",  test_keyboard_interrupt},
-    {TEST_SYS_TRAPS,        "test_sys_traps",           test_sys_traps}
+    {TEST_SYS_TRAPS,        "test_sys_traps",           test_sys_traps},
+    {TEST_RK11,             "test_rk11_disk",           test_rk11_disk}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -231,6 +239,7 @@ void run_test_by_id(int id) {
         case TEST_INTERRUPT     :   test_interrupt();               break;
         case TEST_KEYB_INT      :   test_keyboard_interrupt();      break;
         case TEST_SYS_TRAPS     :   test_sys_traps();               break;
+        case TEST_RK11          :   test_rk11_disk();               break;
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -2916,5 +2925,63 @@ void test_sys_traps(void) {
     //clean
     reset_cpu_state();
 
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+void test_rk11_disk(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+    
+    reset_cpu_state();
+
+    // 1. ПРОГРАММНО СОЗДАЕМ ВРЕМЕННЫЙ ОБРАЗ ДИСКА НА ХОСТ-МАШИНЕ
+    FILE * f_disk = fopen("rt11sj.dsk", "wb");
+    assert(f_disk != NULL);
+    
+    // Запишем в самое начало файла (сектор 0) секретный маркер: два слова 0xABC1 и 0x55AA
+    Word test_word1 = 0xABC1;
+    Word test_word2 = 0x55AA;
+    fwrite(&test_word1, 2, 1, f_disk);
+    fwrite(&test_word2, 2, 1, f_disk);
+    
+    // Добиваем файл нулями до размера хотя бы одного сектора (512 байт), чтобы fseek не ругался
+    Byte padding[508] = {0};
+    fwrite(padding, 1, 508, f_disk);
+    fclose(f_disk);
+
+    // 2. НАСТРАИВАЕМ РЕГИСТРЫ ДИСКОВОГО КОНТРОЛЛЕРА ЧЕРЕЗ ТВОЮ ФУНКЦИЮ w_write
+    w_write(0177412, 0000000, MEMSPACE); // RKDA = 0 (Сектор 0, Дорожка 0)
+    w_write(0177410, 0004000, MEMSPACE); // RKBA = 004000 (Загрузить данные в ОЗУ по адресу 004000)
+    
+    // RKWC = -2 (Мы хотим прочесть ровно 2 слова. Отрицательное число в доп. коде: ~2 + 1 = 0177776)
+    w_write(0177406, 0177776, MEMSPACE); 
+
+    // 3. ЗАПУСКАЕМ ОПЕРАЦИЮ ЧТЕНИЯ ДИСКА
+    // Записываем команду чтения (код 2) в регистр RKCS с принудительным сбросом 7-го бита Ready в 0
+    // Биты команды сдвинуты влево на 1: (2 << 1) = 4. 
+    // Записываем число 4 (7-й бит в нуле). w_write поймает этот сброс бита и вызовет rk11_step()!
+    w_write(0177404, 0000004, MEMSPACE);
+
+    // 4. ПРОВЕРЯЕМ РЕЗУЛЬТАТ РАБОТЫ DMA КОНТРОЛЛЕРА
+    // Контроллер обязан вернуть флаг Ready (0200) в единицу после окончания переноса секторов
+    Word current_rkcs = w_read(0177404);
+    assert((current_rkcs & 0000200) != 0); // Проверяем, что Ready равен 1
+    assert((current_rkcs & 0100000) == 0); // Проверяем, что нет бита ошибки Error
+
+    // Проверяем, что регистры аппаратно обновились
+    assert(rk11_rkwc == 0);      // Счетчик слов RKWC обязан дотикать до 0!
+    assert(rk11_rkba == 004004);  // Адрес шины RKBA обязан продвинуться вперед на 2 слова (+4 байта)
+
+    // 5. САМАЯ ГЛАВНАЯ АППАРАТНАЯ ПРОВЕРКА: Появились ли данные в ОЗУ эмулятора?
+    // Вычитываем данные из mem[] через твою функцию w_read
+    Word data_from_mem1 = w_read(004000);
+    Word data_from_mem2 = w_read(004002);
+    
+    assert(data_from_mem1 == 0xABC1); // Первое слово совпало с диском!
+    assert(data_from_mem2 == 0x55AA); // Второе слово совпало с диском!
+
+    // 6. УДАЛЯЕМ ВРЕМЕННЫЙ ФАЙЛ С КОМПЬЮТЕРА, ЧТОБЫ ОСТАВИТЬ РЕПОЗИТОРИЙ ЧИСТЫМ
+    remove("rt11sj.dsk");
+
+    reset_cpu_state();
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }

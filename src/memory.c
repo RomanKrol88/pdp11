@@ -12,25 +12,28 @@
 
 Byte mem[MEMSIZE];          //оперативная память
 
-#define OSTAT   0177564     //регистр состояния дисплея (флаг готовности)
-#define ODATA   0177566     //регистр данных дисплея (ASCII-код символа)
-#define RCSR    0177560     //регистр состояния приемника (клавиатуры)
-#define RBUF    0177562     //регистр данных приемника (ASCII-код нажатой клавиши)
-#define LKS     0177546     //регистр состояния системного таймера (часов)
+//ПЕРИФЕРИЙНЫЕ УСТРОЙСТВА ВВОДА-ВЫВОДА (MEMORY-MAPPED I/O):
+//Клавиатура KL11
+Byte keyboard_rcsr = 0;     //регистр состояния приемника (7-й бит — флаг Ready, 6-й бит — флаг IE)
+Byte keyboard_rbuf = 0;     //регистр данных приемника (буфер хранения ASCII-кода нажатой клавиши)
 
-Byte keyboard_rcsr = 0;     //флаг состояния клавиатуры (взводится 7-й бит при готовности)
-Byte keyboard_rbuf = 0;     //буфер хранения ASCII-кода нажатой клавиши
-Byte timer_lks = 0;         //флаг состояния регистра LKS системного таймера
+//Системный таймер KW11-L
+Byte timer_lks     = 0;     //регистр состояния часов (7-й бит — флаг тика LCM, 6-й бит — флаг IE)
 
-//функция проверяет, нажата ли клавиша в stdin без блокировки программы
-static int check_keyboard(void) {
-    struct timeval tv = {0, 0};
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(STDIN_FILENO, &fds);
-    return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
-}
+//Дисковый контроллер RK11 (Управление дисководами RK05)
+Word rk11_rkds     = 0;     //регистр состояния привода (биты-флаги готовности головок, блокировки и т.д.)
+Word rk11_rker     = 0;     //регистр ошибок (биты-флаги сбоев чтения, переполнения или плохих секторов)
+Word rk11_rkwc     = 0;     //счетчик слов (числовой параметр: сколько 16-битных слов нужно перенести)
+Word rk11_rkba     = 0;     //адрес шины (числовой параметр: указатель на буфер адреса в ОЗУ эмулятора mem)
+Word rk11_rkda     = 0;     //адрес на диске (числовые параметры: упакованные номера сектора, дорожки и диска)
 
+//Центральный регистр управления контроллера диска RK11
+// Биты 1-3 — числовой код команды (2 — чтение, 1 — запись секторов)
+// 6-й бит — флаг разрешения прерываний (Interrupt Enable)
+// 7-й бит — флаг готовности контроллера (Ready). Изначально равен 1 (октально 0200)
+Word rk11_rkcs     = 0000200; 
+
+static int check_keyboard(void);        //функция проверяет, нажата ли клавиша в stdin без блокировки программы
 static int load_data(FILE * file);      //функция читает данные из файла и записывает в память (возвращает код ошибки или 0, если прочитано без ошибок)
 
 void b_write (Address adr, Byte val) {
@@ -79,6 +82,14 @@ void b_write (Address adr, Byte val) {
         return; 
     }
 
+     //перехват байтовой записи в регистры диска RK11
+    if (adr >= RKDS && adr <= RKDA) {
+        // Запись байта в регистры ввода-вывода обычно запрещена или эквивалентна слову.
+        // Перенаправляем в w_write, выравнивая адрес на четную границу слова.
+        w_write(adr & ~1, (Word)val, MEMSPACE);
+        return;
+    }
+
     mem[adr] = val;
 }
 
@@ -114,6 +125,15 @@ Byte b_read (Address adr) {
         Byte val = timer_lks;
         timer_lks &= ~000200; // АППАРАТНЫЙ СБРОС: чтение регистра сбрасывает флаг готовности
         return val;
+    }
+
+    //перехват байтового чтения регистров диска RK11
+    if (adr >= RKDS && adr <= RKDA) {
+        Word w_val = w_read(adr & ~1);
+        if (adr & 1) {
+            return (Byte)((w_val >> 8) & 0xFF);
+        }
+        return (Byte)(w_val & 0xFF);
     }
 
     return mem[adr];
@@ -167,6 +187,22 @@ void w_write (Address adr, Word val, int space) {
         return;
     }
 
+    //перехват записи в регистры диска RK11
+    if (adr == RKDS) { rk11_rkds = val; return; }
+    if (adr == RKER) { rk11_rker = val; return; }
+    if (adr == RKWC) { rk11_rkwc = val; return; }
+    if (adr == RKBA) { rk11_rkba = val; return; }
+    if (adr == RKDA) { rk11_rkda = val; return; }
+    
+    if (adr == RKCS) {
+        rk11_rkcs = val;
+        //если бит Ready (0200) сброшен в 0, контроллер уходит выполнять дисковый обмен
+        if ((rk11_rkcs & 0000200) == 0) {
+            rk11_step(); 
+        }
+        return;
+    }
+
     //оригинальные системные коды ошибок DEC
     if ((adr & 1) != 0) {
         EMULATOR_EXIT(EXIT_MEM_ALIGNMENT, "Odd word address alignment at %06o (Trap Vector 4)", adr);
@@ -200,6 +236,14 @@ Word w_read (Address a) {
         return (Word)b_read(LKS);
     }
 
+    //перехват чтения регистров диска RK11
+    if (a == RKDS) return rk11_rkds;
+    if (a == RKER) return rk11_rker;
+    if (a == RKCS) return rk11_rkcs;
+    if (a == RKWC) return rk11_rkwc;
+    if (a == RKBA) return rk11_rkba;
+    if (a == RKDA) return rk11_rkda;
+    
     Word w = mem[a + 1];
     w = w << 8;
     w = w | mem[a];
@@ -282,4 +326,91 @@ void load_file(const char * filename) {
     }
 
     print_log(LOG_INFO, "File loaded into memory successfully");
+}
+
+static int check_keyboard(void) {
+    struct timeval tv = {0, 0};
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
+}
+
+void rk11_step(void) {
+    // 1. Извлекаем код операции из регистра управления RKCS
+    // Биты 1-3 (маска 016) задают команду. Сдвигаем вправо на 1 бит.
+    Word command = (rk11_rkcs >> 1) & 07;
+
+    // Нас интересует только команда ЧТЕНИЯ СЕКТОРА (код команды равен 2)
+    if (command == 2) {
+        // Открываем файл-образ диска в бинарном режиме чтения
+        FILE * disk = fopen("rt11sj.dsk", "rb");
+        if (disk == NULL) {
+            print_log(LOG_ERROR, ">>> RK11 ERROR: Cannot open disk image file 'rt11sj.dsk'!");
+            // Взводим 15-й бит ошибки в RKCS и возвращаем Ready = 1
+            rk11_rkcs |= 0100200; 
+            return;
+        }
+
+        // 2. Рассчитываем физическое смещение в файле диска
+        // В оригинальном RKDA младшие 4 бита (0-3) — это номер сектора (0-11)
+        Word sector = rk11_rkda & 017; 
+        // Биты 4-12 задают номер цилиндра/дорожки
+        Word track = (rk11_rkda >> 4) & 0377;
+        
+        // Линейный номер сектора на диске: (дорожка * 12 секторов на дорожке) + текущий сектор
+        long sector_index = (track * 12) + sector;
+        // Смещение в байтах от начала файла: каждый сектор строго по 512 байт
+        long file_offset = sector_index * 512;
+
+        // Позиционируем указатель чтения в файле образа
+        if (fseek(disk, file_offset, SEEK_SET) != 0) {
+            print_log(LOG_ERROR, ">>> RK11 ERROR: fseek failed to offset %ld!", file_offset);
+            rk11_rkcs |= 0100200;
+            fclose(disk);
+            return;
+        }
+
+        print_log(LOG_TRACE, ">>> RK11 READ: Track %d, Sector %d (Offset %ld bytes)", track, sector, file_offset);
+
+        // 3. Вычисляем реальное количество слов для переноса
+        // Так как RKWC отрицательный, получаем модуль числа: ~WC + 1
+        int words_to_read = 0;
+        if (rk11_rkwc != 0) {
+            words_to_read = (int)((~rk11_rkwc + 1) & 0xFFFF);
+        }
+
+        // 4. Пословный цикл переноса данных в ОЗУ эмулятора mem[]
+        Address current_mem_addr = rk11_rkba;
+        int words_transferred = 0;
+
+        for (int i = 0; i < words_to_read; i++) {
+            Word disk_word = 0;
+            // Читаем из файла одно 16-битное слово (2 байта)
+            if (fread(&disk_word, 2, 1, disk) != 1) {
+                // Если файл кончился раньше времени, прекращаем чтение
+                break; 
+            }
+
+            // Переносим считанное слово в оперативную память mem через твою функцию w_write
+            w_write(current_mem_addr, disk_word, MEMSPACE);
+
+            // Инкрементируем адрес в ОЗУ на 2 байта (1 слово)
+            current_mem_addr += 2;
+            words_transferred++;
+        }
+
+        fclose(disk);
+
+        // 5. АППАРАТНОЕ ОБНОВЛЕНИЕ РЕГИСТРОВ ПОСЛЕ ОПЕРАЦИИ:
+        // Счетчик слов RKWC увеличивается на количество перенесенных слов
+        rk11_rkwc = (Word)((rk11_rkwc + words_transferred) & 0xFFFF);
+        // Адрес шины RKBA продвигается вперед на объем перенесенных данных
+        rk11_rkba = current_mem_addr;
+
+        print_log(LOG_TRACE, ">>> RK11 SUCCESS: Transferred %d words to memory address %06o", words_transferred, rk11_rkba);
+    }
+
+    // В ЛЮБОМ СЛУЧАЕ: Возвращаем 7-й бит готовности контроллера Ready в единицу (0200)
+    rk11_rkcs |= 0000200; 
 }
