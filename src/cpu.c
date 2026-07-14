@@ -106,36 +106,36 @@ void reg_dump() {
     print_log(LOG_TRACE, "R0:%o R1:%o R2:%o R3:%o R4:%o R5:%o R6:%o R7:%o", reg[0], reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]);
 }
 
-Command parse_cmd(Word w) {
+Command parse_cmd(Word inst_word) {
 
-    byte_cmd = (w >> 15) & 1;
+    byte_cmd = (inst_word >> 15) & 1;
 
     //поиск в таблице команд
     for (size_t i = 0; i < COMMAND_COUNT; i++) {
-        if ((w & command[i].mask) == command[i].opcode) {   
+        if ((inst_word & command[i].mask) == command[i].opcode) {   
             //проверка флага SS
             if (command[i].params & HAS_SS) {
-                ss = get_operand(w >> 6);
+                ss = get_operand((inst_word >> 6) & 0x3F);
             }
             //проверка флага DD
             if (command[i].params & HAS_DD) {
-                dd = get_operand(w);
+                dd = get_operand(inst_word & 0x3F);
             }
             //проверка флага RLEFT
             if (command[i].params & HAS_RLEFT) {
-                r = (w >> 6) & 7;
+                r = (inst_word >> 6) & 7;
             }
             //проверка флага RRIGHT
             if (command[i].params & HAS_RRIGHT) {
-                r = w & 7;
+                r = inst_word & 7;
             }
             //проверка флага NN
             if (command[i].params & HAS_NN) {
-                nn = w & 077;
+                nn = inst_word & 077;
             }
             //проверка флага XX
             if (command[i].params & HAS_XX) {
-                char offset = (char)(w & 0xFF);
+                char offset = (char)(inst_word & 0xFF);
                 xx = (int)offset;
             }
 
@@ -226,14 +226,14 @@ void run(void) {
     }
 }
 
-Arg get_operand(Word w) {
+Arg get_operand(Word op_bits) {
     Arg res;
     memset(&res, 0, sizeof(Arg));
 
     Address pointer_adr;    // указатель на адрес
     Word x;                 // смещение (для моды 6 и 7)
-    int m = (w >> 3) & 7;   // номер моды
-    int r = w & 7;          // номер регистра
+    int m = (op_bits >> 3) & 7;   // номер моды
+    int r = op_bits & 7;          // номер регистра
 
     res.space = MEMSPACE;   //записываем в память (кроме моды 0)
 
@@ -322,8 +322,9 @@ Arg get_operand(Word w) {
         case 6:
             x = w_read(PC); 
             PC += 2;
-            res.adr = (Address)(reg[r] + (short)x);     //адрес указателя со смещением
-            res.val = w_read(res.adr);                  //по адресу - значение
+            Word base_reg_val6 = (r == 7) ? PC : reg[r];                    //убираем рассинхрон PC != reg[7]
+            res.adr = (Address)((base_reg_val6 + (short)x) & 0xFFFF);       //адрес указателя со смещением
+            res.val = w_read(res.adr);                                      //по адресу - значение
 
             //трассировка
             if (r == 7) sprintf(res.name, "%o", res.adr);
@@ -334,13 +335,14 @@ Arg get_operand(Word w) {
         case 7:
             x = w_read(PC); 
             PC += 2;
-            pointer_adr = (Address)(reg[r] + (short)x); //адрес указателя со смещением
-            res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
-            res.val = w_read(res.adr);                  //по целевому адресу - значение
+            Word base_reg_val7 = (r == 7) ? PC : reg[r];                    //убираем рассинхрон PC != reg[7]
+            pointer_adr = (Address)((base_reg_val7  + (short)x) & 0xFFFF);  //адрес указателя со смещением
+            res.adr = w_read(pointer_adr);                                  //по адресу - целевой адрес
+            res.val = w_read(res.adr);                                      //по целевому адресу - значение
 
             //трассировка
             if (r == 7) sprintf(res.name, "@#%o", res.adr);
-            else sprintf(res.name, "@#%o", res.adr);
+            else sprintf(res.name, "@%o(R%d)", x, r);
             break;
 
         default:
@@ -351,8 +353,8 @@ Arg get_operand(Word w) {
     return res;
 }
 
-void w_reg_write(int r, Word val) {
-    reg[r] = val;
+void w_reg_write(int reg_num, Word value) {
+    reg[reg_num] = value;
 }
 
 void set_flags_NZ(Word val) {
@@ -367,13 +369,13 @@ void set_flags_NZ(Word val) {
     }
 }
 
-void set_flag_C(DWord val) {
+void set_flag_C(DWord val_32) {
     if (byte_cmd) {
         //для байта перенос возникает, если результат вышел за пределы 8 бит (9-й бит взведен)
-        flag_C = (val >> 8) & 1; 
+        flag_C = (val_32 >> 8) & 1; 
     } else {
         //для слова перенос возникает, если результат вышел за пределы 16 бит (17-й бит взведен)
-        flag_C = (val >> 16) & 1; 
+        flag_C = (val_32 >> 16) & 1; 
     }
 }
 

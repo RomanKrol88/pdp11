@@ -72,16 +72,16 @@ typedef enum {
     EXIT_FILE_UNKNOWN     = 14  //ошибка файловой системы (не удалось открыть файл)
 } ExitCode;
 
-void reg_dump(void);                    //функция дампа регистров
-void run(void);                         //функция распознавания и запуска программ
-Arg get_operand(Word w);                //функция разбора агрумента на моду и регистр и вывода на печать
-Command parse_cmd(Word w);              //декодер команд процессора
-void w_reg_write(int r, Word val);      //функция записи слова в регистр
-void set_flags_NZ(Word val);            //функция выставления флагов N и Z
-void set_flag_C(DWord val);             //функция выставления флага переноса C по 32-битному результату
-void timer_tick(void);                  //функция обработки тика таймера
-Word get_psw(void);                     //функция упаковки текущих флагов PSW в одно 16-битное слово
-void interrupts(void);                  //функция проверки и выполнения прерываний от периферии
+void reg_dump(void);                        //функция дампа регистров
+void run(void);                             //функция распознавания и запуска программ
+Arg get_operand(Word op_bits);              //функция разбора агрумента на моду и регистр и вывода на печать
+Command parse_cmd(Word inst_word);          //декодер команд процессора
+void w_reg_write(int reg_num, Word value);  //функция записи слова в регистр
+void set_flags_NZ(Word val);                //функция выставления флагов N и Z
+void set_flag_C(DWord val_32);              //функция выставления флага переноса C по 32-битному результату
+void timer_tick(void);                      //функция обработки тика таймера
+Word get_psw(void);                         //функция упаковки текущих флагов PSW в одно 16-битное слово
+void interrupts(void);                      //функция проверки и выполнения прерываний от периферии
 
 //команды процессора:
 //арифметика и пересылки данных

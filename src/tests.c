@@ -895,8 +895,8 @@ void test_mode7_reg(void) {
     assert(ss.val == 77);
     assert(ss.adr == 000600);
     assert(ss.space == MEMSPACE);
-    assert(strncmp(ss.name, "@#", 2) == 0);
-    assert(strstr(ss.name, "600") != NULL);
+    assert(ss.name[0] == '@');
+    assert(strstr(ss.name, "(R5)") != NULL);
     assert(PC == 002002);
     assert(strcmp(dd.name, "R3") == 0);
 
