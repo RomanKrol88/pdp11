@@ -1332,7 +1332,31 @@ void do_trap(void) {
 }
 
 void do_unknown(void) {
-    Word w = w_read(PC - 2);
-    print_log(LOG_ERROR, "Unknown instruction %06o at address %06o", w, PC - 2);
-    exit(1);
+    // 1. Читаем неизвестный опкод для логирования (уже было у тебя)
+    Word unknown_cmd = w_read(PC - 2);
+    print_log(LOG_TRACE, ">>> TRAP 10: Unknown instruction %06o at address %06o. Triggering Reserved Instruction Trap...", unknown_cmd, PC - 2);
+
+    // 2. Шаг 1 спасения контекста: упаковываем текущие флаги PSW и толкаем их в стек SP (reg[6])
+    Word current_psw = get_psw(); 
+    reg[6] -= 2;
+    w_write(reg[6], current_psw, MEMSPACE);
+
+    // 3. Шаг 2 спасения контекста: толкаем текущий PC (который уже указывает вслед за сбойной командой) в стек SP
+    reg[6] -= 2;
+    w_write(reg[6], PC, MEMSPACE);
+
+    // 4. Шаг 3: Загружаем новый контекст процессора из системного Вектора Трапа 10 (ячейки 000010 и 000012)
+    // Читаем новый адрес начала обработчика исключений операционной системы
+    PC = w_read(0000010); 
+    
+    // Читаем новое слово флагов PSW для обработчика
+    Word new_psw = w_read(0000012);
+    
+    // Распаковываем новые флаги в переменные процессора
+    flag_N = (new_psw >> 3) & 1;
+    flag_Z = (new_psw >> 2) & 1;
+    flag_V = (new_psw >> 1) & 1;
+    flag_C = new_psw & 1;
+    
+    // Управление передано операционной системе, Си-код возвращается в главный цикл run()!
 }
