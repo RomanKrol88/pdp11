@@ -20,6 +20,7 @@ extern Word rk11_rkcs;
 extern Word rk11_rkwc;
 extern Word rk11_rkba;
 extern Word rk11_rkda;
+extern char * os_disk_image;
 
 typedef enum {
     TEST_MEM            =  1,
@@ -178,6 +179,9 @@ void run_test_by_id(int id) {
 
     print_log(LOG_INFO, "=== STARTING SINGLE TEST ID: [%d] NAME: <%s> ===", id, test_table[id - 1].name);
 
+    //СТАРТОВЫЙ АДРЕС ДЛЯ ЮНИТ-ТЕСТОВ:
+    PC = 001000;
+
     switch ((TestID)id) {
         case TEST_MEM           :   test_mem();                     break;
         case TEST_PARSE_MOV     :   test_parse_mov();               break;
@@ -257,7 +261,7 @@ void run_test_by_name(const char *name) {
 }
 
 //вспомогательная функция для сброса всех регистров и флагов процессора в исходное состояние (clear)
-static void reset_cpu_state(void) {
+void reset_cpu_state(void) {
     //обнуление регистров
     for (int i = 0; i < REGSIZE; i++) {
         reg[i] = 0;
@@ -3002,6 +3006,11 @@ void test_rk11_disk(void) {
     
     reset_cpu_state();
 
+    // ===================================================================
+    // ПОДМЕНА ДИСКА: Перенаправляем контроллер на временный файл теста!
+    // ===================================================================
+    os_disk_image = "rt11sj.dsk"; 
+
     // 1. ПРОГРАММНО СОЗДАЕМ ВРЕМЕННЫЙ ОБРАЗ ДИСКА НА ХОСТ-МАШИНЕ
     FILE * f_disk = fopen("rt11sj.dsk", "wb");
     assert(f_disk != NULL);
@@ -3021,35 +3030,35 @@ void test_rk11_disk(void) {
     w_write(0177412, 0000000, MEMSPACE); // RKDA = 0 (Сектор 0, Дорожка 0)
     w_write(0177410, 0004000, MEMSPACE); // RKBA = 004000 (Загрузить данные в ОЗУ по адресу 004000)
     
-    // RKWC = -2 (Мы хотим прочесть ровно 2 слова. Отрицательное число в доп. коде: ~2 + 1 = 0177776)
+    // RKWC = -2 (Мы хотим прочесть ровно 2 слова)
     w_write(0177406, 0177776, MEMSPACE); 
 
     // 3. ЗАПУСКАЕМ ОПЕРАЦИЮ ЧТЕНИЯ ДИСКА
-    // Записываем команду чтения (код 2) в регистр RKCS с принудительным сбросом 7-го бита Ready в 0
-    // Биты команды сдвинуты влево на 1: (2 << 1) = 4. 
-    // Записываем число 4 (7-й бит в нуле). w_write поймает этот сброс бита и вызовет rk11_step()!
     w_write(0177404, 0000004, MEMSPACE);
 
     // 4. ПРОВЕРЯЕМ РЕЗУЛЬТАТ РАБОТЫ DMA КОНТРОЛЛЕРА
-    // Контроллер обязан вернуть флаг Ready (0200) в единицу после окончания переноса секторов
     Word current_rkcs = w_read(0177404);
-    assert((current_rkcs & 0000200) != 0); // Проверяем, что Ready равен 1
-    assert((current_rkcs & 0100000) == 0); // Проверяем, что нет бита ошибки Error
+    assert((current_rkcs & 0000200) != 0); 
+    assert((current_rkcs & 0100000) == 0); 
 
     // Проверяем, что регистры аппаратно обновились
-    assert(rk11_rkwc == 0);      // Счетчик слов RKWC обязан дотикать до 0!
-    assert(rk11_rkba == 004004);  // Адрес шины RKBA обязан продвинуться вперед на 2 слова (+4 байта)
+    assert(rk11_rkwc == 0);      
+    assert(rk11_rkba == 004004);  
 
     // 5. САМАЯ ГЛАВНАЯ АППАРАТНАЯ ПРОВЕРКА: Появились ли данные в ОЗУ эмулятора?
-    // Вычитываем данные из mem[] через твою функцию w_read
     Word data_from_mem1 = w_read(004000);
     Word data_from_mem2 = w_read(004002);
     
-    assert(data_from_mem1 == 0xABC1); // Первое слово совпало с диском!
-    assert(data_from_mem2 == 0x55AA); // Второе слово совпало с диском!
+    assert(data_from_mem1 == 0xABC1); 
+    assert(data_from_mem2 == 0x55AA); 
 
-    // 6. УДАЛЯЕМ ВРЕМЕННЫЙ ФАЙЛ С КОМПЬЮТЕРА, ЧТОБЫ ОСТАВИТЬ РЕПОЗИТОРИЙ ЧИСТЫМ
+    // 6. УДАЛЯЕМ ВРЕМЕННЫЙ ФАЙЛ С КОМПЬЮТЕРА
     remove("rt11sj.dsk");
+
+    // ===================================================================
+    // ВОЗВРАЩАЕМ ИМЯ РЕАЛЬНОЙ ОС ОБРАТНО перед выходом из теста!
+    // ===================================================================
+    os_disk_image = "rt11v400.dsk";
 
     reset_cpu_state();
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);

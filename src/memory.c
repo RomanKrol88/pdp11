@@ -10,6 +10,8 @@
 #include <unistd.h>
 #include <termios.h>
 
+extern char * os_disk_image;
+
 Byte mem[MEMSIZE];          //оперативная память
 
 //ПЕРИФЕРИЙНЫЕ УСТРОЙСТВА ВВОДА-ВЫВОДА (MEMORY-MAPPED I/O):
@@ -343,11 +345,11 @@ void rk11_step(void) {
 
     // Нас интересует только команда ЧТЕНИЯ СЕКТОРА (код команды равен 2)
     if (command == 2) {
-        // Открываем файл-образ диска в бинарном режиме чтения
-        FILE * disk = fopen("rt11sj.dsk", "rb");
+        // Открываем файл-образ диска в бинарном режиме чтения по глобальному имени
+        FILE * disk = fopen(os_disk_image, "rb");
+        
         if (disk == NULL) {
-            print_log(LOG_ERROR, ">>> RK11 ERROR: Cannot open disk image file 'rt11sj.dsk'!");
-            // Взводим 15-й бит ошибки в RKCS и возвращаем Ready = 1
+            print_log(LOG_ERROR, ">>> RK11 ERROR: Cannot open disk image file '%s'!", os_disk_image);
             rk11_rkcs |= 0100200; 
             return;
         }

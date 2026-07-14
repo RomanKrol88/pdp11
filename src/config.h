@@ -9,6 +9,6 @@ typedef unsigned short Word;    //16-битное слово
 typedef unsigned int DWord;     //32-битный формат для симметрии
 typedef Word Address;           //16-битный адрес памяти
 
-void run_interactive_echo(void);
+void boot_rt11(void);           //аппаратный запуск операционной системы RT-11 V4.00 из файла rt11v400.dsk
 
 #endif

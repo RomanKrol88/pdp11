@@ -1,6 +1,8 @@
 #ifndef TESTS_H
 #define TESTS_H
 
+void reset_cpu_state(void);                 //вспомогательная функция для сброса всех регистров и флагов процессора в исходное состояние (clear)
+
 //1. Функции запуска тестов с флагами:
 void run_all_tests(void);                   //запуск всех тестов
 void run_test_by_id(int id);                //запуск теста по ID
