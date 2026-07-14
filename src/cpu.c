@@ -1225,14 +1225,22 @@ void do_mul(void) {
     int signed_res = (int)s * (int)r_val;
     DWord res32 = (DWord)signed_res;
 
-    int r_high = r;
-    int r_low = r | 1;
+    if ((r & 1) == 0) {
+        // Если чётный (R0, R2, R4): пишем обе половинки в пару регистров
+        reg[r] = (Word)((res32 >> 16) & 0xFFFF);
+        reg[r + 1] = (Word)(res32 & 0xFFFF);
+        
+        // Флаг N для чётного регистра смотрит на самый старший 31-й бит
+        flag_N = (res32 >> 31) & 1;
+    } else {
+        // Если нечётный (R1, R3, R5): пишем ТОЛЬКО младшие 16 бит
+        reg[r] = (Word)(res32 & 0xFFFF);
+        
+        // Флаг N для нечётного регистра смотрит строго на 15-й бит младшего слова!
+        flag_N = (res32 >> 15) & 1;
+    }
 
-    reg[r_high] = (Word)((res32 >> 16) & 0xFFFF);
-    reg[r_low] = (Word)(res32 & 0xFFFF);
-
-    flag_Z = (signed_res == 0);
-    flag_N = (res32 >> 31) & 1;
+    flag_Z = (res32 & 0xFFFF) == 0; // Z всегда по младшим 16 битам
     flag_V = 0;
     flag_C = (signed_res < -32768 || signed_res > 32767);
 }
