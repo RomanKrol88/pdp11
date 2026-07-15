@@ -388,16 +388,23 @@ void rk11_step(void) {
 
         for (int i = 0; i < words_to_read; i++) {
             Word disk_word = 0;
-            // Читаем из файла одно 16-битное слово (2 байта)
             if (fread(&disk_word, 2, 1, disk) != 1) {
-                // Если файл кончился раньше времени, прекращаем чтение
                 break; 
             }
 
-            // Переносим считанное слово в оперативную память mem через твою функцию w_write
-            w_write(current_mem_addr, disk_word, MEMSPACE);
+            // ===================================================================
+            // ОТЛАДКА: Смотрим, что реально прочитал fread и куда пишет DMA
+            // ===================================================================
+            if (i < 4) {
+                print_log(LOG_INFO, ">>> DEBUG RK11: i=%d, disk_word=%06o, target_addr=%06o", i, disk_word, current_mem_addr);
+            }
+            // ===================================================================
 
-            // Инкрементируем адрес в ОЗУ на 2 байта (1 слово)
+            if (current_mem_addr < MEMSIZE - 1) {
+                mem[current_mem_addr] = (Byte)(disk_word & 0xFF);         
+                mem[current_mem_addr + 1] = (Byte)((disk_word >> 8) & 0xFF); 
+            }
+
             current_mem_addr += 2;
             words_transferred++;
         }
@@ -414,5 +421,5 @@ void rk11_step(void) {
     }
 
     // В ЛЮБОМ СЛУЧАЕ: Возвращаем 7-й бит готовности контроллера Ready в единицу (0200)
-    rk11_rkcs |= 0000200; 
+    rk11_rkcs |= 000220; 
 }

@@ -24,6 +24,8 @@ Command command[] = {   //таблица команд
     {0177400, 0001400,  "beq",      do_beq,     HAS_XX},
     {0177400, 0002000,  "bge",      do_bge,     HAS_XX}, 
     {0177400, 0003000,  "bgt",      do_bgt,     HAS_XX},
+    {0170000, 0030000,  "bit",      do_bit,     HAS_SS | HAS_DD},
+    {0170000, 0130000,  "bitb",     do_bit,     HAS_SS | HAS_DD},
     {0170000, 0040000,  "bic",      do_bic,     HAS_SS | HAS_DD},
     {0170000, 0140000,  "bicb",     do_bic,     HAS_SS | HAS_DD},
     {0177400, 0101000,  "bhi",      do_bhi,     HAS_XX}, 
@@ -33,6 +35,8 @@ Command command[] = {   //таблица команд
     {0177400, 0100400,  "bmi",      do_bmi,     HAS_XX}, 
     {0177400, 0001000,  "bne",      do_bne,     HAS_XX}, 
     {0177400, 0100000,  "bpl",      do_bpl,     HAS_XX},
+    {0170000, 0050000,  "bis",      do_bis,     HAS_SS | HAS_DD},
+    {0170000, 0150000,  "bisb",     do_bis,     HAS_SS | HAS_DD},
     {0177400, 0000400,  "br",       do_br,      HAS_XX},
     {0177400, 0102000,  "bvc",      do_bvc,     HAS_XX}, 
     {0177400, 0102400,  "bvs",      do_bvs,     HAS_XX},
@@ -76,7 +80,7 @@ Command command[] = {   //таблица команд
     {0177777, 0000270,  "sen",      do_set_fl,  NO_PARAMS},
     {0177777, 0000262,  "sev",      do_set_fl,  NO_PARAMS},
     {0177777, 0000264,  "sez",      do_set_fl,  NO_PARAMS},
-    {0177000, 0077000,  "sob",      do_sob,     HAS_RLEFT | HAS_NN},
+    {0177000, 0007000,  "sob",      do_sob,     HAS_RLEFT | HAS_NN},
     {0170000, 0160000,  "sub",      do_sub,     HAS_SS | HAS_DD},
     {0177700, 0000300,  "swab",     do_swab,    HAS_DD},
     {0177700, 0006700,  "sxt",      do_sxt,     HAS_DD},
@@ -112,7 +116,7 @@ Command parse_cmd(Word inst_word) {
 
     //поиск в таблице команд
     for (size_t i = 0; i < COMMAND_COUNT; i++) {
-        if ((inst_word & command[i].mask) == command[i].opcode) {   
+        if ((inst_word & command[i].mask) == command[i].opcode) {  
             //проверка флага SS
             if (command[i].params & HAS_SS) {
                 ss = get_operand((inst_word >> 6) & 0x3F);
@@ -398,9 +402,23 @@ Word get_psw(void) {
 }
 
 void interrupts(void) {
-    //условие прерывания клавиатуры: взведены и Ready (0200), и Interrupt Enable (0100)
-    if ((keyboard_rcsr & 000300) == 000300) {
+    // 1. Условие аппаратного прерывания дискового контроллера RK11
+    if ((rk11_rkcs & 000300) == 000300) {
+        rk11_rkcs &= ~000200; 
+
+        SP -= 2;
+        w_write(SP, get_psw(), MEMSPACE);
+        SP -= 2;
+        w_write(SP, PC, MEMSPACE);
         
+        PC = w_read(000220);
+        flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
+        print_log(LOG_TRACE, ">>> INTERRUPT: RK11 Disk triggered! Vector 0220 loaded. New PC: %06o", PC);
+        return;
+    }
+
+    // 2. Условие прерывания клавиатуры
+    if ((keyboard_rcsr & 000300) == 000300) {
         keyboard_rcsr &= ~000200;
 
         SP -= 2;
@@ -409,27 +427,22 @@ void interrupts(void) {
         w_write(SP, PC, MEMSPACE);
         
         PC = w_read(000060);
-        
         flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
-        
         print_log(LOG_TRACE, ">>> INTERRUPT: Keyboard triggered! Vector 0060 loaded. New PC: %06o", PC);
         return;
     }
 
-    //условие прерывания таймера: взведены и флаг тика (0200) и разрешение прерываний (0100)
+    // 3. Условие прерывания таймера
     if ((timer_lks & 0300) == 0300) {
         timer_lks &= ~0200; 
         
         SP -= 2;
         w_write(SP, get_psw(), MEMSPACE);
-        
         SP -= 2;
         w_write(SP, PC, MEMSPACE);
         
         PC = w_read(000100);
-        
         flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
-        
         print_log(LOG_TRACE, ">>> INTERRUPT: Timer triggered! Vector 0100 loaded. New PC: %06o", PC);
     }
 }
@@ -646,11 +659,11 @@ void do_tst(void) {
 }
 
 void do_jsr(void) {
-    Word target_pc = dd.adr;
+    Word dst_addr = (dd.space == REGSPACE) ? reg[dd.adr] : dd.adr;
     SP -= 2;
     w_write(SP, reg[r], MEMSPACE);
     reg[r] = PC;
-    PC = target_pc;
+    PC = dst_addr;
 }
 
 void do_rts(void) {
@@ -832,7 +845,10 @@ void do_bis(void) {
         Byte res = (Byte)(d | s);
 
         if (dd.space == REGSPACE) {
-            reg[dd.adr] = (signed char)res;
+            // Сохраняем оригинальный старший байт регистра Rn нетронутым!
+            Word high_byte = reg[dd.adr] & 0xFF00;
+            // Записываем результат только в младший байт и склеиваем слово
+            reg[dd.adr] = high_byte | res;
         } else {
             b_write(dd.adr, res);
         }
@@ -1007,14 +1023,7 @@ void do_inc(void) {
 }
 
 void do_jmp(void) {
-    //мода 0 (прямая адресация регистра) для JMP запрещена
-    if (dd.space == REGSPACE) {
-        print_log(LOG_ERROR, "HALT: Illegal JMP instruction using Register Mode 0 at address %06o", PC - 2);
-        do_halt();
-        return;
-    }
-
-    PC = dd.adr;
+    PC = (dd.space == REGSPACE) ? reg[dd.adr] : dd.adr;
 }
 
 void do_neg(void) {
@@ -1276,18 +1285,19 @@ void do_div(void) {
 }
 
 void do_rti(void) {
-    //возврат PC из стека
+    //извлекаем сохраненный PC из стека SP
     PC = w_read(SP);
     SP += 2;
     
-    //возврат PSW из стека и восстановление флагов
+    //извлекаем сохраненный PSW из стека SP
     Word old_psw = w_read(SP);
     SP += 2;
     
-    flag_N = (old_psw & 010) ? 1 : 0;
-    flag_Z = (old_psw & 004) ? 1 : 0;
-    flag_V = (old_psw & 002) ? 1 : 0;
-    flag_C = (old_psw & 001) ? 1 : 0;
+    //восстанавливаем флаги условий
+    flag_N = (old_psw >> 3) & 1;
+    flag_Z = (old_psw >> 2) & 1;
+    flag_V = (old_psw >> 1) & 1;
+    flag_C = old_psw & 1;
     
     print_log(LOG_TRACE, ">>> RTI: Returned from interrupt. Restored PC: %06o", PC);
 }
@@ -1329,31 +1339,21 @@ void do_trap(void) {
 }
 
 void do_unknown(void) {
-    // 1. Читаем неизвестный опкод для логирования (уже было у тебя)
     Word unknown_cmd = w_read(PC - 2);
     print_log(LOG_TRACE, ">>> TRAP 10: Unknown instruction %06o at address %06o. Triggering Reserved Instruction Trap...", unknown_cmd, PC - 2);
 
-    // 2. Шаг 1 спасения контекста: упаковываем текущие флаги PSW и толкаем их в стек SP (reg[6])
     Word current_psw = get_psw(); 
-    reg[6] -= 2;
-    w_write(reg[6], current_psw, MEMSPACE);
+    SP -= 2;
+    w_write(SP, current_psw, MEMSPACE);
 
-    // 3. Шаг 2 спасения контекста: толкаем текущий PC (который уже указывает вслед за сбойной командой) в стек SP
-    reg[6] -= 2;
-    w_write(reg[6], PC, MEMSPACE);
+    SP -= 2;
+    w_write(SP, PC, MEMSPACE);
 
-    // 4. Шаг 3: Загружаем новый контекст процессора из системного Вектора Трапа 10 (ячейки 000010 и 000012)
-    // Читаем новый адрес начала обработчика исключений операционной системы
     PC = w_read(0000010); 
-    
-    // Читаем новое слово флагов PSW для обработчика
     Word new_psw = w_read(0000012);
     
-    // Распаковываем новые флаги в переменные процессора
     flag_N = (new_psw >> 3) & 1;
     flag_Z = (new_psw >> 2) & 1;
     flag_V = (new_psw >> 1) & 1;
     flag_C = new_psw & 1;
-    
-    // Управление передано операционной системе, Си-код возвращается в главный цикл run()!
 }
