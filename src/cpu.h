@@ -152,4 +152,11 @@ void do_emt(void);      // EMT    [104000] NZVC=0000 | Программный т
 void do_trap(void);     // TRAP   [104400] NZVC=0000 | Программный пользовательский трап по вектору 000034
 void do_unknown(void);  // DU     [------] NZVC=---- | Заглушка нереализованных зон дешифратора опкодов
 
+
+void do_fadd(void);
+
+void do_sys4k(void);
+void do_cfcc(void);
+
+
 #endif

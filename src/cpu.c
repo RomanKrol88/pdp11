@@ -87,7 +87,7 @@ Command command[] = {   //таблица команд
     {0177700, 0005700,  "tst",      do_tst,     HAS_DD},
     {0177700, 0105700,  "tstb",     do_tst,     HAS_DD},
     {0177400, 0104400,  "trap",     do_trap,    NO_PARAMS},
-    {0177000, 0074000,  "xor",      do_xor,     HAS_RLEFT | HAS_DD},    
+    {0177000, 0074000,  "xor",      do_xor,     HAS_RLEFT | HAS_DD},
     {0000000, 0000000,  "unknown",  do_unknown, NO_PARAMS}
 };
 
@@ -153,13 +153,12 @@ void run(void) {
     Word w;     //текущее слово, которое содержит команду
     
     while(1) {
-        timer_tick();                                   //вызываем обработчик таймера на каждом шаге цикла процессора
+        timer_tick();                                   //вызываем обработчик таймера на каждом шаге цикла процессора      
+        interrupts();                                   //проверяем, нет ли запроса от периферии на прерывание
         w = w_read(PC);                                 //читаем текущее слово
         Address current_pc = PC;                        //сохраняем текущее значение РС для вывода в лог
         PC += 2;                                        //PC сразу же указывает на следующее неразобранное слово
         Command cmd = parse_cmd(w);                     //декодируем считанное слово
-
-        interrupts();                                   //проверяем, нет ли запроса от периферии на прерывание
 
         //печатаем лог в стиле MACRO-11
         if (strcmp(cmd.name, "unknown") == 0) {
@@ -220,7 +219,7 @@ void run(void) {
             print_log(LOG_TRACE, "%06o %06o: %s %s, %s", current_pc, w, cmd.name, ss.name, dd.name);
         }
 
-        // выполняем команду
+        //выполняем команду
         cmd.do_command();
 
         reg_dump();
@@ -251,8 +250,7 @@ Arg get_operand(Word op_bits) {
         case 1:
             res.adr = reg[r];                           //в регистре адрес
             if (byte_cmd) {
-                //маскируем верхний байт после знакового расширения, чтобы не забить его единицами 0xFFXX
-                res.val = (Word)((signed char)b_read(res.adr) & 0xFF); 
+                res.val = (Word)((signed char)b_read(res.adr));
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }                                       
@@ -263,8 +261,7 @@ Arg get_operand(Word op_bits) {
         case 2:
             res.adr = reg[r];                           //в регистре адрес
             if (byte_cmd) {
-                //маскируем верхний байт
-                res.val = (Word)((signed char)b_read(res.adr) & 0xFF); 
+                res.val = (Word)((signed char)b_read(res.adr)); 
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }
@@ -303,7 +300,7 @@ Arg get_operand(Word op_bits) {
             }
             res.adr = reg[r];                           //в регистре новый адрес
             if (byte_cmd) {
-                res.val = (Word)((signed char)b_read(res.adr) & 0xFF); 
+                res.val = (Word)((signed char)b_read(res.adr)); 
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }
@@ -394,14 +391,25 @@ void timer_tick(void) {
 
 Word get_psw(void) {
     Word psw = 0;
-    if (flag_N) psw |= 000010; // 3-й бит
-    if (flag_Z) psw |= 000004; // 2-й бит
-    if (flag_V) psw |= 000002; // 1-й бит
-    if (flag_C) psw |= 000001; // 0-й бит
+    psw |= (flag_N & 1) << 3; // Бит 3 — флаг N
+    psw |= (flag_Z & 1) << 2; // Бит 2 — флаг Z
+    psw |= (flag_V & 1) << 1; // Бит 1 — флаг V
+    psw |= (flag_C & 1);      // Бит 0 — флаг C
     return psw;
 }
 
 void interrupts(void) {
+    // АППАРАТНЫЙ КАНOН DEC: Проверяем текущий уровень приоритета процессора
+    // Биты 5-7 регистра PSW хранят уровень приоритета (0-7)
+    Word current_psw = get_psw();
+    int cpu_priority = (current_psw >> 5) & 7;
+
+    // Прерывания от таймера и диска имеют 6-й уровень приоритета.
+    // Если процессор работает на приоритете 6 или 7, прерывания блокируются!
+    if (cpu_priority >= 6) {
+        return;
+    }
+
     // 1. Условие аппаратного прерывания дискового контроллера RK11
     if ((rk11_rkcs & 000300) == 000300) {
         rk11_rkcs &= ~000200; 

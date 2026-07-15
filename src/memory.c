@@ -388,18 +388,13 @@ void rk11_step(void) {
 
         for (int i = 0; i < words_to_read; i++) {
             Word disk_word = 0;
+            
+            // ИСПРАВЛЕНО: Читаем строго по 2 байта (1 целое 16-битное слово) за раз!
             if (fread(&disk_word, 2, 1, disk) != 1) {
                 break; 
             }
 
-            // ===================================================================
-            // ОТЛАДКА: Смотрим, что реально прочитал fread и куда пишет DMA
-            // ===================================================================
-            if (i < 4) {
-                print_log(LOG_INFO, ">>> DEBUG RK11: i=%d, disk_word=%06o, target_addr=%06o", i, disk_word, current_mem_addr);
-            }
-            // ===================================================================
-
+            // ПРЯМОЙ DMA-ПЕРЕНОС В ОЗУ:
             if (current_mem_addr < MEMSIZE - 1) {
                 mem[current_mem_addr] = (Byte)(disk_word & 0xFF);         
                 mem[current_mem_addr + 1] = (Byte)((disk_word >> 8) & 0xFF); 
@@ -407,6 +402,14 @@ void rk11_step(void) {
 
             current_mem_addr += 2;
             words_transferred++;
+        }
+
+        // Вышли из цикла чтения. Проверяем, почему он завершился:
+        if (words_transferred < words_to_read) {
+            print_log(LOG_ERROR, ">>> RK11 KАТАСТРОФА: Цикл прерван! Прочитано только %d слов из %d. Ошибка файла: %d", 
+                      words_transferred, words_to_read, ferror(disk));
+        } else {
+            print_log(LOG_INFO, ">>> RK11 УСПЕХ: Полностью прочитано %d слов бут-сектора!", words_transferred);
         }
 
         fclose(disk);
