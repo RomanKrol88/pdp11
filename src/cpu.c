@@ -82,6 +82,7 @@ Command command[] = {   //таблица команд
     {0177777, 0000277,  "scc",      do_set_fl,  NO_PARAMS},
     {0177777, 0000261,  "sec",      do_set_fl,  NO_PARAMS},
     {0177777, 0000270,  "sen",      do_set_fl,  NO_PARAMS},
+    {0177777, 0170000,  "setf",     do_setf,    NO_PARAMS},
     {0177777, 0000262,  "sev",      do_set_fl,  NO_PARAMS},
     {0177777, 0000264,  "sez",      do_set_fl,  NO_PARAMS},
     {0177000, 0077000,  "sob",      do_sob,     HAS_RLEFT | HAS_NN},
@@ -110,6 +111,12 @@ int byte_cmd = 0;           //1 — команда BYTE, 0 — команда WO
 
 int output_print = 0;       //переменная для беспрефиксного вывода stdout на дисплей
 
+//регистры сопроцессора FPU (FP-11)
+double fpu_ac[6] = {0.0};  // Шесть 64-битных регистров плавающей точки AC0 - AC5
+Word fpu_fpsr = 0;         // Регистр состояния FPU (Floating-point Status Register)
+
+int abort_instruction = 0;  // Флаг экстренного прерывания текущей команды
+
 void reg_dump() {
     print_log(LOG_TRACE, "R0:%o R1:%o R2:%o R3:%o R4:%o R5:%o R6:%o R7:%o", reg[0], reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]);
 }
@@ -124,10 +131,12 @@ Command parse_cmd(Word inst_word) {
             //проверка флага SS
             if (command[i].params & HAS_SS) {
                 ss = get_operand((inst_word >> 6) & 0x3F);
+                if (abort_instruction) return command[i]; //БЛОКИРОВКА ЕСЛИ ТРАП
             }
             //проверка флага DD
             if (command[i].params & HAS_DD) {
                 dd = get_operand(inst_word & 0x3F);
+                if (abort_instruction) return command[i]; //БЛОКИРОВКА ЕСЛИ ТРАП
             }
             //проверка флага RLEFT
             if (command[i].params & HAS_RLEFT) {
@@ -159,10 +168,15 @@ void run(void) {
     while(1) {
         timer_tick();                                   //вызываем обработчик таймера на каждом шаге цикла процессора      
         interrupts();                                   //проверяем, нет ли запроса от периферии на прерывание
+        abort_instruction = 0;                          //сбрасываем флаг перед чтением новой инструкции
         w = w_read(PC);                                 //читаем текущее слово
         Address current_pc = PC;                        //сохраняем текущее значение РС для вывода в лог
         PC += 2;                                        //PC сразу же указывает на следующее неразобранное слово
         Command cmd = parse_cmd(w);                     //декодируем считанное слово
+
+        if (abort_instruction) {
+            continue; 
+        }
 
         //печатаем лог в стиле MACRO-11
         if (strcmp(cmd.name, "unknown") == 0) {
@@ -172,8 +186,11 @@ void run(void) {
                    strcmp(cmd.name, "nop") == 0  || strcmp(cmd.name, "reset") == 0 ||
                    strcmp(cmd.name, "scc") == 0  || strcmp(cmd.name, "sec") == 0   ||
                    strcmp(cmd.name, "sev") == 0  || strcmp(cmd.name, "sez") == 0   ||
-                   strcmp(cmd.name, "sen") == 0) {
+                   strcmp(cmd.name, "sen") == 0  || strcmp(cmd.name, "setf") == 0) {
             print_log(LOG_TRACE, "%06o %06o: %s", current_pc, w, cmd.name);
+        } else if (strcmp(cmd.name, "fadd") == 0  || strcmp(cmd.name, "fsub") == 0  ||
+                   strcmp(cmd.name, "fmul") == 0  || strcmp(cmd.name, "fdiv") == 0) {
+            print_log(LOG_TRACE, "%06o %06o: %s R%d", current_pc, w, cmd.name, r);
         } else if (strcmp(cmd.name, "br") == 0 || strcmp(cmd.name, "bpl") == 0  || 
                  strcmp(cmd.name, "bne") == 0  || strcmp(cmd.name, "beq") == 0  ||
                  strcmp(cmd.name, "bcc") == 0  || strcmp(cmd.name, "bcs") == 0  ||
@@ -1372,24 +1389,66 @@ void do_unknown(void) {
 
 // Функция чтения 32-битного float из ОЗУ PDP-11 по указателю адреса
 float read_dec_float(Address addr) {
-    DecFloat df;
-    // В памяти PDP-11 сначала идет младшее слово, затем старшее
-    df.words.lo = w_read(addr);
-    df.words.hi = w_read(addr + 2);
+    // В PDP-11 старшее слово (знак + экспонента) лежит по адресу addr,
+    // а младшее слово (хвост мантиссы) — по адресу addr + 2
+    Word hi_word = w_read(addr);
+    Word lo_word = w_read(addr + 2);
     
-    // ВНИМАНИЕ: Формат float в PDP-11 незначительно отличается от современного IEEE 754
-    // (у DEC сдвиг экспоненты 128, а у IEEE 754 — 127, плюс бит знака).
-    // Для базовой загрузки ОС RT-11 прямое побитовое приведение в 99% случаев достаточно,
-    // но если потребуется идеальная точность мантиссы, мы добавим сдвиг экспоненты.
-    return df.f;
+    // Склеиваем в сырое 32-битное слово PDP-11
+    unsigned int pdp_raw = ((unsigned int)hi_word << 16) | lo_word;
+    
+    // Если число — чистый ноль в формате DEC, то это ноль и в IEEE 754
+    if (pdp_raw == 0) return 0.0f;
+    
+    // Выделяем биты по спецификации DEC Float
+    unsigned int sign = (pdp_raw >> 31) & 1;
+    unsigned int exp  = (pdp_raw >> 23) & 0xFF;
+    unsigned int mant = pdp_raw & 0x7FFFFF;
+    
+    // Корректируем сдвиг экспоненты (у DEC сдвиг 128, у IEEE 754 сдвиг 127)
+    // Из-за этого вычитаем единицу из экспоненты
+    int ieee_exp = (int)exp - 1;
+    if (ieee_exp < 0) ieee_exp = 0; // Защита от антипереполнения
+    
+    // Собираем сырое 32-битное слово для формата IEEE 754
+    unsigned int ieee_raw = (sign << 31) | ((unsigned int)ieee_exp << 23) | mant;
+    
+    // Безопасный каст битовой маски в живой float языка Си
+    union { unsigned int u; float f; } cast;
+    cast.u = ieee_raw;
+    return cast.f;
 }
 
 // Функция записи 32-битного float обратно в ОЗУ PDP-11
 void write_dec_float(Address addr, float val) {
-    DecFloat df;
-    df.f = val;
-    w_write(addr, df.words.lo, MEMSPACE);
-    w_write(addr + 2, df.words.hi, MEMSPACE);
+    if (val == 0.0f) {
+        w_write(addr, 0, MEMSPACE);
+        w_write(addr + 2, 0, MEMSPACE);
+        return;
+    }
+    
+    // Извлекаем биты из живого float языка Си (IEEE 754)
+    union { float f; unsigned int u; } cast;
+    cast.f = val;
+    unsigned int ieee_raw = cast.u;
+    
+    unsigned int sign = (ieee_raw >> 31) & 1;
+    unsigned int exp  = (ieee_raw >> 23) & 0xFF;
+    unsigned int mant = ieee_raw & 0x7FFFFF;
+    
+    // Корректируем сдвиг экспоненты в сторону DEC (+1)
+    unsigned int pdp_exp = exp + 1;
+    if (pdp_exp > 0xFF) pdp_exp = 0xFF; // Защита от переполнения
+    
+    // Собираем сырое 32-битное слово DEC Float
+    unsigned int pdp_raw = (sign << 31) | (pdp_exp << 23) | mant;
+    
+    // Раскладываем по словам PDP-11: старшее по адресу addr, младшее по addr + 2
+    Word hi_word = (Word)((pdp_raw >> 16) & 0xFFFF);
+    Word lo_word = (Word)(pdp_raw & 0xFFFF);
+    
+    w_write(addr, hi_word, MEMSPACE);
+    w_write(addr + 2, lo_word, MEMSPACE);
 }
 
 // Универсальный обработчик всей группы FIS-команд
@@ -1440,4 +1499,42 @@ void do_fmul(void) {
 
 void do_fdiv(void) { 
     do_fis_math("fdiv"); 
+}
+
+void do_setf(void) {
+    // По канону DEC FP-11: сбрасываем бит FD (8-й бит регистра FPSR) в ноль.
+    // Это переключает FPU с 64-битного формата Double на 32-битный Single float.
+    fpu_fpsr &= ~FPU_BIT_FD;
+    
+    // Очищаем флаги условий самого сопроцессора (FN, FZ, FV, FC в младшем байте FPSR)
+    fpu_fpsr &= ~(FPU_BIT_FN | FPU_BIT_FZ | FPU_BIT_FV | FPU_BIT_FC);
+    
+    // По спецификации, живые флаги основного процессора (flag_N, flag_Z) команда НЕ трогает
+}
+
+void do_trap4(void) {
+    print_log(LOG_TRACE, ">>> BUS ERROR TRAP: Saving context and branching to Vector 4...");
+
+    abort_instruction = 1; //АППАРАТНЫЙ СИГНАЛ ПРЕРЫВАНИЯ
+
+    // 1. Уменьшаем указатель аппаратного стека SP (R6) на 2
+    reg[6] -= 2;
+    
+    // ПРЯМАЯ ЗАПИСЬ PSW В МАССИВ ОЗУ (минуя w_write периферии, чтобы исключить циклическую рекурсию)
+    Address adr_psw = reg[6];
+    Word psw_val = get_psw();
+    mem[adr_psw] = (Byte)(psw_val & 0xFF);
+    mem[adr_psw + 1] = (Byte)((psw_val >> 8) & 0xFF);
+
+    // 2. Уменьшаем SP на 2
+    reg[6] -= 2;
+    
+    // ПРЯМАЯ ЗАПИСЬ PC В МАССИВ ОЗУ
+    Address adr_pc = reg[6];
+    mem[adr_pc] = (Byte)(PC & 0xFF);
+    mem[adr_pc + 1] = (Byte)((PC >> 8) & 0xFF);
+
+    // 3. Аппаратно загружаем новый PC из ячейки вектора 000004
+    // Здесь используем w_read, так как вектор 4 лежит в гарантированно живом начале ОЗУ
+    PC = w_read(0000004);
 }

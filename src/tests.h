@@ -82,5 +82,7 @@ void test_interrupt(void);                  //тест для проверки �
 void test_keyboard_interrupt(void);         //тест для проверки аппаратных прерываний клавиатуры TRAP 0060
 void test_sys_traps(void);                  //тест для проверки программных прерываний по векторам 0030 (EMT) и 0034 (TRAP)
 void test_rk11_disk(void);                  //тест для проверки чтения секторов из бинарного образа диска rt11sj.dsk RK11 DMA
+void test_setf(void);                       //тест для проверки инициализации FPU командой SETF
+void test_trap4(void);                      //тест для проверки на возникновение прерывания Bus Error по вектору 4
 
 #endif

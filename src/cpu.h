@@ -10,6 +10,17 @@
 #define REGSPACE 1      //пространство адресов регистров
 #define MEMSPACE 0      //пространство адресов оперативной памяти
 
+//регистры и флаги сопроцессора FPU (FP-11)
+extern double fpu_ac[6];     //шесть математических регистров AC0 - AC5
+extern Word fpu_fpsr;        //регистр состояния FPU (Floating Status)
+
+//быстрые макросы для флагов условий FPU (по канону DEC)
+#define FPU_BIT_FD   (1 << 8)  //бит режима: 0 = Single (float), 1 = Double
+#define FPU_BIT_FN   (1 << 3)  //флаг отрицательного результата FPU
+#define FPU_BIT_FZ   (1 << 2)  //флаг нулевого результата FPU
+#define FPU_BIT_FV   (1 << 1)  //флаг переполнения FPU
+#define FPU_BIT_FC   (1 << 0)  //флаг переноса/заёма FPU
+
 //битовые флаги параметров команд:
 #define NO_PARAMS   0
 #define HAS_DD      (1 << 0)  //1   (0000001) - DD (6 бит) - источник в битах 6-11
@@ -40,6 +51,8 @@ extern int xx;
 
 extern Byte timer_lks;
 extern Byte keyboard_rcsr;
+
+extern int abort_instruction;
 
 typedef struct {
     Word val;       //значение операнда
@@ -166,6 +179,8 @@ void do_halt(void);     // HALT   [000000] NZVC=---- | Останов проце
 void do_rti(void);      // RTI    [000002] NZVC=vvvv | Возврат из обработчика прерывания через стек
 void do_emt(void);      // EMT    [104000] NZVC=0000 | Программный трап эмулятора по вектору 000030
 void do_trap(void);     // TRAP   [104400] NZVC=0000 | Программный пользовательский трап по вектору 000034
+void do_setf(void);     // SETF   [170000] NZVC=---- | Инициализация FPU в режим Single Precision
+void do_trap4(void);    // TRAP4  [VEC_04] NZVC=---- | Ловушка Ошибки шины / Несуществующей памяти по вектору 000004
 void do_unknown(void);  // DU     [------] NZVC=---- | Заглушка нереализованных зон дешифратора опкодов
 
 #endif

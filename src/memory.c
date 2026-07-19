@@ -142,7 +142,7 @@ Byte b_read (Address adr) {
 }
 
 void w_write (Address adr, Word val, int space) {
-    if (space == REGSPACE) {                        //проерка адресного пространства (куда писать значение)
+    if (space == REGSPACE) {                        //проверка адресного пространства (куда писать значение)
         w_reg_write(adr, val); 
         return;
     }
@@ -213,13 +213,22 @@ void w_write (Address adr, Word val, int space) {
         EMULATOR_EXIT(EXIT_MEM_BOUNDS, "Address %06o out of memory bounds (Trap Vector 10)", adr);
     }
 
+    // Перехват записи в системные порты конфигурации
+    if (adr == 0177776 || adr == 0177570 || adr == 0172000 || adr == 0172540 || adr == 0172032 || adr == 0177546 || adr == 0177746 || adr == 0177760) {
+        return; 
+    }
+
+    if (adr >= 0160000) {
+        do_trap4();
+        return;
+    }
+
     mem[adr] = (Byte)(val & 0xFF);                  //младший байт (остаток от деления на 256)   
     mem[adr + 1] = (Byte)((val >> 8) & 0xFF);       //старший байт (сдвиг на 8 бит вправо)
 }
 
 Word w_read (Address a) {
     assert((a & 1) == 0);       //проверка, что адрес слова четный
-    assert(a < MEMSIZE - 1);    //проверка, что адрес не выходит за границы памяти
 
     if (a == OSTAT) {
         return 0200;
@@ -245,6 +254,16 @@ Word w_read (Address a) {
     if (a == RKWC) return rk11_rkwc;
     if (a == RKBA) return rk11_rkba;
     if (a == RKDA) return rk11_rkda;
+
+    // Перехват системных портов конфигурации оборудования PDP-11
+    if (a == 0177776 || a == 0177570 || a == 0172000 || a == 0172540 || a == 0172032 || a == 0177546 || a == 0177746 || a == 0177760) {
+        return 0; 
+    }
+
+    if (a >= 0160000) {
+        do_trap4();
+        return 0; 
+    }
     
     Word w = mem[a + 1];
     w = w << 8;

@@ -87,7 +87,9 @@ typedef enum {
     TEST_FADD           = 62,
     TEST_FSUB           = 63,
     TEST_FMUL           = 64,
-    TEST_FDIV           = 65
+    TEST_FDIV           = 65,
+    TEST_SETF           = 66,
+    TEST_TRAP4          = 67
 } TestID;
 
 typedef struct {
@@ -161,7 +163,9 @@ static const TestCase test_table[] = {
     {TEST_FADD,             "test_fadd",                test_fadd},
     {TEST_FSUB,             "test_fsub",                test_fsub},
     {TEST_FMUL,             "test_fmul",                test_fmul},
-    {TEST_FDIV,             "test_fdiv",                test_fdiv}
+    {TEST_FDIV,             "test_fdiv",                test_fdiv},
+    {TEST_SETF,             "test_setf",                test_setf},
+    {TEST_TRAP4,            "test_trap4",               test_trap4}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -255,7 +259,9 @@ void run_test_by_id(int id) {
         case TEST_FADD          :   test_fadd();                    break;
         case TEST_FSUB          :   test_fsub();                    break;
         case TEST_FMUL          :   test_fmul();                    break;
-        case TEST_FDIV          :   test_fdiv();                    break;       
+        case TEST_FDIV          :   test_fdiv();                    break;  
+        case TEST_SETF          :   test_setf();                    break;
+        case TEST_TRAP4         :   test_trap4();                   break;     
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -295,6 +301,14 @@ void reset_cpu_state(void) {
     memset(ss.name, 0, sizeof(ss.name));
     dd.val = 0; dd.adr = 0; dd.space = 0;
     memset(dd.name, 0, sizeof(dd.name));
+
+    //очистка регистров и флагов сопроцессора FPU
+    for (int i = 0; i < 6; i++) {
+        fpu_ac[i] = 0.0;
+    }
+    fpu_fpsr = 0;
+
+    abort_instruction = 0;
 }
 
 
@@ -1271,7 +1285,7 @@ void test_tst(void) {
 void test_jsr_rts(void) {
     print_log(LOG_TRACE,"Testing function <%s> ...", __FUNCTION__);
 
-    SP = 0177700; 
+    SP = 0010000; 
     reg[2] = 12;
     flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
     
@@ -1313,7 +1327,7 @@ void test_jsr_rts(void) {
     
     assert(PC == 024616);
     assert(reg[2] == 12);
-    assert(SP == 0177700);
+    assert(SP == 0010000);
     assert(flag_N == 0); 
     assert(flag_Z == 0); 
     assert(flag_V == 0); 
@@ -3213,5 +3227,73 @@ void test_fdiv(void) {
     assert(flag_C == 0);
 
     reset_cpu_state();
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест для првоерки инициализации FPU командой SETF
+void test_setf(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+
+    // setup: взводим бит FD и флаги условий FPU, чтобы проверить их сброс
+    byte_cmd = 0;
+    flag_N = 1; flag_Z = 1; flag_V = 1; flag_C = 1; // основные флаги (не должны измениться)
+    
+    // Имитируем, что в FPSR взведены бит режима Double и флаги ошибок
+    fpu_fpsr = FPU_BIT_FD | FPU_BIT_FN | FPU_BIT_FZ | FPU_BIT_FV | FPU_BIT_FC;
+
+    do_setf();
+
+    // Проверяем, что FPSR полностью очистился (бит FD сброшен в 0, FPU в режиме Single)
+    assert(fpu_fpsr == 0);
+    
+    // Проверяем, что живые флаги основного процессора остались нетронутыми
+    assert(flag_N == 1);
+    assert(flag_Z == 1);
+    assert(flag_V == 1);
+    assert(flag_C == 1);
+
+    // clean
+    reset_cpu_state();
+
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на возникновение прерывания Bus Error по вектору 4
+void test_trap4(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+
+    // setup контекста
+    byte_cmd = 0;
+    PC = 001234; // Имитируем текущий адрес команды
+    reg[6] = 001000; // Настраиваем системный стек SP (R6) на адрес 1000
+    
+    // Принудительно взводим флаги основного процессора, чтобы проверить их упаковку в PSW
+    flag_N = 1; flag_Z = 0; flag_V = 1; flag_C = 0; // Маска флагов даст 012 (восьмеричное)
+
+    // Записываем в ОЗУ фейковый адрес системного обработчика в вектор 4
+    w_write(0000004, 005550, MEMSPACE); // Новый PC после сбоя должен стать равен 5550
+
+    // Провоцируем сбой: вызываем чтение из мертвого адреса 0170000
+    // w_read должна сама поймать адрес >= 0160000 и вызвать do_trap4()
+    Word dummy = w_read(0170000);
+    (void)dummy; // Гасим варнинг компилятора о неиспользуемой переменной
+
+    // 🔬 ПРОВЕРКА ПО ПРИБОРАМ:
+    // 1. Проверяем, что PC аппаратно прыгнул на адрес из вектора 4
+    assert(PC == 005550);
+
+    // 2. Проверяем, что стек SP (R6) сдвинулся вниз на два слова (4 байта)
+    assert(reg[6] == 000774);
+
+    // 3. Проверяем, что на вершине стека (по новому адресу SP) лежит спасенный PC возврата
+    assert(w_read(reg[6]) == 001234);
+
+    // 4. Проверяем, что чуть выше в стеке (по адресу SP + 2) лежит упакованный PSW с нашими флагами
+    Word saved_psw = w_read(reg[6] + 2);
+    assert((saved_psw & 017) == 012); // Биты флагов N и V обязаны быть на месте
+
+    // clean
+    reset_cpu_state();
+
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
 }
