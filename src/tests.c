@@ -83,7 +83,11 @@ typedef enum {
     TEST_INTERRUPT      = 58,
     TEST_KEYB_INT       = 59,
     TEST_SYS_TRAPS      = 60,
-    TEST_RK11           = 61
+    TEST_RK11           = 61,
+    TEST_FADD           = 62,
+    TEST_FSUB           = 63,
+    TEST_FMUL           = 64,
+    TEST_FDIV           = 65
 } TestID;
 
 typedef struct {
@@ -153,7 +157,11 @@ static const TestCase test_table[] = {
     {TEST_INTERRUPT,        "test_interrupt",           test_interrupt},
     {TEST_KEYB_INT,         "test_keyboard_interrupt",  test_keyboard_interrupt},
     {TEST_SYS_TRAPS,        "test_sys_traps",           test_sys_traps},
-    {TEST_RK11,             "test_rk11_disk",           test_rk11_disk}
+    {TEST_RK11,             "test_rk11_disk",           test_rk11_disk},
+    {TEST_FADD,             "test_fadd",                test_fadd},
+    {TEST_FSUB,             "test_fsub",                test_fsub},
+    {TEST_FMUL,             "test_fmul",                test_fmul},
+    {TEST_FDIV,             "test_fdiv",                test_fdiv}
 };
 
 #define TEST_SIZE (sizeof(test_table) / sizeof(test_table[0]))
@@ -244,6 +252,10 @@ void run_test_by_id(int id) {
         case TEST_KEYB_INT      :   test_keyboard_interrupt();      break;
         case TEST_SYS_TRAPS     :   test_sys_traps();               break;
         case TEST_RK11          :   test_rk11_disk();               break;
+        case TEST_FADD          :   test_fadd();                    break;
+        case TEST_FSUB          :   test_fsub();                    break;
+        case TEST_FMUL          :   test_fmul();                    break;
+        case TEST_FDIV          :   test_fdiv();                    break;       
     }
 
     print_log(LOG_INFO, "=== TEST <%s> PASSED SUCCESSFULLY ===", test_table[id - 1].name);
@@ -3059,6 +3071,146 @@ void test_rk11_disk(void) {
     // ВОЗВРАЩАЕМ ИМЯ РЕАЛЬНОЙ ОС ОБРАТНО перед выходом из теста!
     // ===================================================================
     os_disk_image = "rt11v400.dsk";
+
+    reset_cpu_state();
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на вещественное сложение FADD
+void test_fadd(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+
+    // setup сложения (15.5 + 4.5 = 20.0)
+    byte_cmd = 0;
+    r = 3; 
+    flag_C = 1; flag_V = 1; flag_N = 1; flag_Z = 1;
+    
+    reg[3] = 0x0C00; // Адрес стека (3000 восьмеричное)
+    
+    write_dec_float(reg[3], 15.5f);     // (R3) -> теперь тут лежит аргумент A!
+    write_dec_float(reg[3] + 4, 4.5f);  // (R3)+4 -> теперь тут лежит аргумент B!
+
+    do_fadd();
+
+    float res = read_dec_float(0x0C04); 
+
+    assert(res == 20.0f);
+    assert(reg[3] == 0x0C04); // Проверяем продвижение стека на 4 байта
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
+
+    reset_cpu_state();
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на вещественное вычитание FSUB
+void test_fsub(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+
+    // setup получения нуля (7.25 - 7.25 = 0.0)
+    byte_cmd = 0;
+    r = 3; 
+    flag_C = 1; flag_V = 1; flag_N = 1; flag_Z = 0;
+    
+    reg[3] = 0x0C80; // Адрес стека (3200 восьмеричное)
+    
+    write_dec_float(reg[3], 7.25f);     // аргумент A
+    write_dec_float(reg[3] + 4, 7.25f); // аргумент B
+
+    do_fsub();
+
+    float res = read_dec_float(0x0C84); 
+
+    assert(res == 0.0f);
+    assert(reg[3] == 0x0C84);
+    assert(flag_Z == 1); // Флаг нуля должен взвестись
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
+
+    reset_cpu_state();
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на вещественное умножение FMUL
+void test_fmul(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+
+    //setup умножения (2.5 * 4.0 = 10.0)
+    byte_cmd = 0;
+    r = 3; 
+    flag_C = 1; flag_V = 1; flag_N = 1; flag_Z = 1;
+    
+    reg[3] = 0x0D00; // Адрес стека (3400 восьмеричное)
+    
+    write_dec_float(reg[3], 4.0f);     // аргумент B
+    write_dec_float(reg[3] + 4, 2.5f); // аргумент A
+
+    do_fmul();
+
+    float res = read_dec_float(0x0D04);
+
+    assert(res == 10.0f);
+    assert(reg[3] == 0x0D04);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
+
+    reset_cpu_state();
+    print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);
+}
+
+//тест на вещественное деление FDIV
+void test_fdiv(void) {
+    print_log(LOG_TRACE, "Testing function <%s> ...", __FUNCTION__);
+
+    //setup нормального деления (12.0 / 3.0 = 4.0)
+    byte_cmd = 0;
+    r = 3; 
+    flag_C = 1; flag_V = 1; flag_N = 1; flag_Z = 1;
+    
+    reg[3] = 0x0D80; // Адрес стека (3600 восьмеричное)
+    
+    write_dec_float(reg[3], 3.0f);      // аргумент B
+    write_dec_float(reg[3] + 4, 12.0f); // аргумент A
+
+    do_fdiv();
+
+    float res = read_dec_float(0x0D84);
+
+    assert(res == 4.0f);
+    assert(reg[3] == 0x0D84);
+    assert(flag_Z == 0);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
+
+    // clean
+    reset_cpu_state();
+
+    //setup деления на ноль (результат 0.0 по спецификации)
+    byte_cmd = 0;
+    r = 3;
+    flag_C = 1; flag_V = 1; flag_N = 0; flag_Z = 1;
+    
+    reg[3] = 0x0E00; // Новый адрес стека
+    
+    write_dec_float(reg[3], 0.0f);     // деление на 0.0
+    write_dec_float(reg[3] + 4, 5.5f); 
+
+    do_fdiv();
+
+    float res_zero = read_dec_float(0x0E04);
+
+    assert(res_zero == 0.0f);
+    assert(reg[3] == 0x0E04);
+    assert(flag_Z == 1);
+    assert(flag_N == 0);
+    assert(flag_V == 0);
+    assert(flag_C == 0);
 
     reset_cpu_state();
     print_log(LOG_TRACE, "Function <%s> is OK", __FUNCTION__);

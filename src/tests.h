@@ -49,7 +49,10 @@ void test_sxt(void);                        //тест на знаковое р�
 void test_xor(void);                        //тест на исключающее ИЛИ командой XOR
 void test_mul(void);                        //тест на умножение командой MUL
 void test_div(void);                        //тест на деление командой DIV
-
+void test_fadd(void);                       //тест на вещественное сложение FADD
+void test_fsub(void);                       //тест на вещественное вычитание FSUB
+void test_fmul(void);                       //тест на вещественное умножение FMUL
+void test_fdiv(void);                       //тест на вещественное деление FDIV
 
 //4. Юнит-тесты для проверки работы с модами адресации процессора:
 void test_mode0(void);                      //тест на чтение аргументов ss и dd в MOV R5, R3

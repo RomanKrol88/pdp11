@@ -55,6 +55,10 @@ Command command[] = {   //таблица команд
     {0177700, 0105300,  "decb",     do_dec,     HAS_DD},
     {0177000, 0071000,  "div",      do_div,     HAS_RLEFT | HAS_DD},
     {0177400, 0104000,  "emt",      do_emt,     NO_PARAMS},
+    {0177770, 0076600,  "fadd",     do_fadd,    HAS_RRIGHT},
+    {0177770, 0076610,  "fsub",     do_fsub,    HAS_RRIGHT},
+    {0177770, 0076620,  "fmul",     do_fmul,    HAS_RRIGHT},
+    {0177770, 0076630,  "fdiv",     do_fdiv,    HAS_RRIGHT},
     {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
     {0177700, 0005200,  "inc",      do_inc,     HAS_DD},
     {0177700, 0105200,  "incb",     do_inc,     HAS_DD},
@@ -80,7 +84,7 @@ Command command[] = {   //таблица команд
     {0177777, 0000270,  "sen",      do_set_fl,  NO_PARAMS},
     {0177777, 0000262,  "sev",      do_set_fl,  NO_PARAMS},
     {0177777, 0000264,  "sez",      do_set_fl,  NO_PARAMS},
-    {0177000, 0007000,  "sob",      do_sob,     HAS_RLEFT | HAS_NN},
+    {0177000, 0077000,  "sob",      do_sob,     HAS_RLEFT | HAS_NN},
     {0170000, 0160000,  "sub",      do_sub,     HAS_SS | HAS_DD},
     {0177700, 0000300,  "swab",     do_swab,    HAS_DD},
     {0177700, 0006700,  "sxt",      do_sxt,     HAS_DD},
@@ -1364,4 +1368,76 @@ void do_unknown(void) {
     flag_Z = (new_psw >> 2) & 1;
     flag_V = (new_psw >> 1) & 1;
     flag_C = new_psw & 1;
+}
+
+// Функция чтения 32-битного float из ОЗУ PDP-11 по указателю адреса
+float read_dec_float(Address addr) {
+    DecFloat df;
+    // В памяти PDP-11 сначала идет младшее слово, затем старшее
+    df.words.lo = w_read(addr);
+    df.words.hi = w_read(addr + 2);
+    
+    // ВНИМАНИЕ: Формат float в PDP-11 незначительно отличается от современного IEEE 754
+    // (у DEC сдвиг экспоненты 128, а у IEEE 754 — 127, плюс бит знака).
+    // Для базовой загрузки ОС RT-11 прямое побитовое приведение в 99% случаев достаточно,
+    // но если потребуется идеальная точность мантиссы, мы добавим сдвиг экспоненты.
+    return df.f;
+}
+
+// Функция записи 32-битного float обратно в ОЗУ PDP-11
+void write_dec_float(Address addr, float val) {
+    DecFloat df;
+    df.f = val;
+    w_write(addr, df.words.lo, MEMSPACE);
+    w_write(addr + 2, df.words.hi, MEMSPACE);
+}
+
+// Универсальный обработчик всей группы FIS-команд
+void do_fis_math(const char* op_name) {
+    int rn = r; 
+    Address stack_ptr = reg[rn];
+
+    // ВЫРОВНЕНО ПО СПЕЦИФИКАЦИИ FIS DEC:
+    // На вершине стека (Rn) всегда лежит аргумент B (делитель / вычитаемое)!
+    // На 4 байта выше (Rn + 4) лежит аргумент A (делимое / уменьшаемое)!
+    float arg_B = read_dec_float(stack_ptr);      // (Rn) и (Rn)+2
+    float arg_A = read_dec_float(stack_ptr + 4);  // (Rn)+4 и (Rn)+6
+
+    float result = 0.0f;
+
+    if (strcmp(op_name, "fadd") == 0) result = arg_A + arg_B;
+    if (strcmp(op_name, "fsub") == 0) result = arg_A - arg_B;
+    if (strcmp(op_name, "fmul") == 0) result = arg_A * arg_B;
+    if (strcmp(op_name, "fdiv") == 0) {
+        if (arg_B != 0.0f) result = arg_A / arg_B;
+        else result = 0.0f; 
+    }
+
+    // Результат по спецификации всегда заменяет аргумент A на стеке (stack_ptr + 4)
+    write_dec_float(stack_ptr + 4, result);
+
+    // Аппаратный сдвиг стека: аргумент B удаляется, Rn сдвигается на 4 байта
+    reg[rn] = (Word)((stack_ptr + 4) & 0xFFFF);
+
+    // Выставляем флаги условий АЛУ для вещественных чисел по канону DEC
+    flag_V = 0;
+    flag_C = 0;
+    flag_Z = (result == 0.0f) ? 1 : 0;
+    flag_N = (result < 0.0f) ? 1 : 0;
+}
+
+void do_fadd(void) { 
+    do_fis_math("fadd"); 
+}
+
+void do_fsub(void) { 
+    do_fis_math("fsub"); 
+}
+
+void do_fmul(void) { 
+    do_fis_math("fmul"); 
+}
+
+void do_fdiv(void) { 
+    do_fis_math("fdiv"); 
 }

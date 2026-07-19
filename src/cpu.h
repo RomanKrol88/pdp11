@@ -56,6 +56,15 @@ typedef struct {
     char params;
 } Command;
 
+typedef union {
+    float f;
+    unsigned int u32;
+    struct {
+        unsigned short lo;
+        unsigned short hi;
+    } words;
+} DecFloat;
+
 //коды ошибок
 typedef enum {
     EXIT_SUCCESS_HALT     = 0,  //процессор успешно остановлен командой HALT
@@ -72,16 +81,19 @@ typedef enum {
     EXIT_FILE_UNKNOWN     = 14  //ошибка файловой системы (не удалось открыть файл)
 } ExitCode;
 
-void reg_dump(void);                        //функция дампа регистров
-void run(void);                             //функция распознавания и запуска программ
-Arg get_operand(Word op_bits);              //функция разбора агрумента на моду и регистр и вывода на печать
-Command parse_cmd(Word inst_word);          //декодер команд процессора
-void w_reg_write(int reg_num, Word value);  //функция записи слова в регистр
-void set_flags_NZ(Word val);                //функция выставления флагов N и Z
-void set_flag_C(DWord val_32);              //функция выставления флага переноса C по 32-битному результату
-void timer_tick(void);                      //функция обработки тика таймера
-Word get_psw(void);                         //функция упаковки текущих флагов PSW в одно 16-битное слово
-void interrupts(void);                      //функция проверки и выполнения прерываний от периферии
+void reg_dump(void);                            //функция дампа регистров
+void run(void);                                 //функция распознавания и запуска программ
+Arg get_operand(Word op_bits);                  //функция разбора агрумента на моду и регистр и вывода на печать
+Command parse_cmd(Word inst_word);              //декодер команд процессора
+void w_reg_write(int reg_num, Word value);      //функция записи слова в регистр
+void set_flags_NZ(Word val);                    //функция выставления флагов N и Z
+void set_flag_C(DWord val_32);                  //функция выставления флага переноса C по 32-битному результату
+void timer_tick(void);                          //функция обработки тика таймера
+Word get_psw(void);                             //функция упаковки текущих флагов PSW в одно 16-битное слово
+void interrupts(void);                          //функция проверки и выполнения прерываний от периферии
+float read_dec_float(Address addr);             //функция чтения 32-битного float из ОЗУ PDP-11
+void write_dec_float(Address addr, float val);  //функция записи 32-битного float в ОЗУ PDP-11
+void do_fis_math(const char* op_name);          //универсальный обработчик вещественных FIS-команд
 
 //команды процессора:
 //арифметика и пересылки данных
@@ -108,6 +120,10 @@ void do_asr(void);      // ASR    [0062DD] NZVC=**** | Арифметическ�
 void do_rol(void);      // ROL    [B061DD] NZVC=**** | Циклический сдвиг влево через перенос
 void do_ror(void);      // ROR    [B060DD] NZVC=**** | Циклический сдвиг вправо через перенос
 void do_swab(void);     // SWAB   [0003DD] NZVC=**00 | Побайтовый обмен в слове (флаги по новому младшему байту)
+void do_fadd(void);     // FADD   [07660R] NZVC=**00 | Вещественное сложение через стек (Rn) (FIS)
+void do_fsub(void);     // FSUB   [07661R] NZVC=**00 | Вещественное вычитание через стек (Rn) (FIS)
+void do_fmul(void);     // FMUL   [07662R] NZVC=**00 | Вещественное умножение через стек (Rn) (FIS)
+void do_fdiv(void);     // FDIV   [07663R] NZVC=**00 | Вещественное деление через стек (Rn) (FIS)
 
 //побитовая логика
 void do_bic(void);      // BIC    [B4SSDD] NZVC=**0- | Сброс битов по маске (d = d & {~s})
@@ -151,12 +167,5 @@ void do_rti(void);      // RTI    [000002] NZVC=vvvv | Возврат из об�
 void do_emt(void);      // EMT    [104000] NZVC=0000 | Программный трап эмулятора по вектору 000030
 void do_trap(void);     // TRAP   [104400] NZVC=0000 | Программный пользовательский трап по вектору 000034
 void do_unknown(void);  // DU     [------] NZVC=---- | Заглушка нереализованных зон дешифратора опкодов
-
-
-void do_fadd(void);
-
-void do_sys4k(void);
-void do_cfcc(void);
-
 
 #endif
