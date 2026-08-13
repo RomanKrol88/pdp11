@@ -74,6 +74,8 @@ void test_flags_mov_zero(void);             //тест в MOV на флаг Z = 
 void test_flags_mov_negative(void);         //тест в MOV на флаг N = 1, остальные 0
 void test_flags_add_carry(void);            //тест в ADD на C = 1 и Z = 1, остальные 0
 void test_flags_add_overflow(void);         //тест в ADD на V = 1 и N = 1, остальные 0
+void test_mtps(void);                       //тест для проверки записи в регистр состояния PSW командой MTPS
+void test_mfps(void);                       //тест для проверки чтения регистра состояния PSW командой MFPS
 
 //6. Юнит-тесты для проверки работы исполняемых модулей
 void test_keyboard(void);                   //тест для проверки ввода символов с клавиатуры
@@ -84,5 +86,10 @@ void test_sys_traps(void);                  //тест для проверки �
 void test_rk11_disk(void);                  //тест для проверки чтения секторов из бинарного образа диска rt11sj.dsk RK11 DMA
 void test_setf(void);                       //тест для проверки инициализации FPU командой SETF
 void test_trap4(void);                      //тест для проверки на возникновение прерывания Bus Error по вектору 4
+void test_ldf(void);                        //тест для проверки загрузки вещественного значения командой LDF
+void test_stf(void);                        //тест для проверки выгрузки вещественного значения командой STF
+void test_trap244(void);                    //тест для проверки на возникновение прерывания ошибок FPU по вектору 244
+void test_trap10(void);                     //тест для проверки на аппаратную ловушку нереализованной команды TRAP 10
+void test_rtt(void);                        //тест для проверки возврата из системной отладочной ловушки командой RTT
 
 #endif

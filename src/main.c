@@ -20,6 +20,22 @@ void restore_terminal_atexit(void) {
 }
 
 int main (int argc, char * argv[])  {
+    setvbuf(stdout, NULL, _IONBF, 0);
+
+    // ===================================================================
+    // ГЛОБАЛЬНЫЙ НЕБЛОКИРУЮЩИЙ РЕЖИМ КОНСОЛИ:
+    // ===================================================================
+    struct termios new_t;
+    tcgetattr(STDIN_FILENO, &original_tty_settings); 
+    atexit(restore_terminal_atexit); 
+
+    new_t = original_tty_settings;
+    new_t.c_lflag &= ~(ICANON | ECHO); 
+    new_t.c_lflag |= ISIG;             
+    new_t.c_cc[VMIN] = 0;                     
+    new_t.c_cc[VTIME] = 0;                    
+    tcsetattr(STDIN_FILENO, TCSANOW, &new_t);
+
     // 1. УСТАНОВКА ПО УМОЛЧАНИЮ: выставляем базовый уровень логирования LOG_INFO
     set_log_level(LOG_INFO);
 
@@ -79,7 +95,6 @@ int main (int argc, char * argv[])  {
     // 5. ДИСПЕТЧЕРИЗАЦИЯ РЕЖИМОВ
     if (filename == NULL) {
         // Если имя файла НЕ указано, по умолчанию стартует операционная система RT-11!
-        // Она запустится с уровнем LOG_INFO (или с тем флагом, который передал пользователь)
         boot_rt11();
         return 0;
     }
@@ -90,10 +105,14 @@ int main (int argc, char * argv[])  {
     print_log(LOG_INFO, "==================================================");
 
     load_file(filename);
+    
+    PC = 0001000;
+
     run();
     
     return 0;
 }
+
 
 void boot_rt11(void) {
     const char * dsk_filename = "rt11v400.dsk"; 
@@ -106,43 +125,38 @@ void boot_rt11(void) {
     // 1. Полностью сбрасываем состояние процессора в ноль
     reset_cpu_state();
 
-    // 2. Имитируем аппаратное ПЗУ загрузки (ROM Boot) для диска RK05:
+    // 2. Инициализируем регистры контроллера диска строго по канону DEC RK11:
     rk11_rkda = 0000000;          // Стартуем строго с 0-го сектора диска
-    rk11_rkba = 0000000;          // Буфер в ОЗУ: Кладём бут-код на адрес 001000
-    rk11_rkwc = 0160000;          // Читаем сразу 40 системных секторов (10240 слов), чтобы заполнить ОЗУ кодом ядра!
-    rk11_rkds = 0004700;          // Выставляем каноничный статус готовности привода RK05 (Drive Ready + OK)
+    rk11_rkba = 0000000;          // Данные должны ложиться строго с адреса 000000
+    
+    // Дополнение до двух для 10240 слов (40 секторов) — это строго 0154000 восьмеричное!
+    rk11_rkwc = 0154000;          
+    
+    rk11_rkds = 0004700;          // Выставляем статус готовности привода RK05
+    rk11_rkcs = 0000005;          // Команда чтения (02) + бит GO (01) = 000005.
 
-    // Проверяем физическое наличие файла диска в корне проекта
-    FILE * f = fopen(os_disk_image, "rb");
-    if (f == NULL) {
-        print_log(LOG_ERROR, "FATAL: Image file '%s' not found! Put it in project root.", dsk_filename);
-        return;
-    }
-    fclose(f);
+    timer_lks = 0000000;          // Холодный старт таймера по канону DEC KW11-L
 
-    // 3. Вызываем физическое чтение Сектора 0 контроллером RK11 в память mem[]
-    // Запись бита GO в регистр управления RKCS запускает DMA-обмен
-    w_write(0177404, 0000004, MEMSPACE);
+    // Вызываем физическое чтение секторов напрямую через функцию контроллера
+    rk11_step();
 
-    print_log(LOG_INFO, "Boot sector (Sector 0) loaded into memory successfully.");
+    print_log(LOG_INFO, "Boot sectors (40 sectors) loaded into memory successfully.");
     print_log(LOG_INFO, "Handing over control to RT-11 bootloader...");
     print_log(LOG_INFO, "--------------------------------------------------");
 
-    // Аппаратная инициализация массива регистров по канону DEC перед стартом:
-    reg[0] = 0;        // Номер системного привода (Drive 0) в R0
-    reg[1] = 0177404;  // Физический адрес базового регистра управления RKCS в R1
-    reg[6] = 0002000;  // Ставим стек SP (R6) чуть ниже начала кода бут-сектора
-
-    // Переводим консоль Linux/WSL в сырой неблокирующий режим termios
-    struct termios new_t;
-    tcgetattr(STDIN_FILENO, &original_tty_settings); 
-    atexit(restore_terminal_atexit); // Авто-восстановление консоли при выходе
-
-    new_t = original_tty_settings;
-    new_t.c_lflag &= ~(ICANON | ECHO); 
-    tcsetattr(STDIN_FILENO, TCSANOW, &new_t);
+    // ===============================================
+    // Сбрасываем флаг автотестов и пишем приглашение
+    // ===============================================
+    extern int autotest_mode;
+    autotest_mode = 0; 
+    
+    print_log(LOG_INFO, "[BOOT] Operating System is active.");
+    print_log(LOG_INFO, "[BOOT] Press ANY KEY to wake up the system scheduler...");
+    print_log(LOG_INFO, "--------------------------------------------------");
+    // ===============================================
 
     // 4. Запускаем процессор СТРОГО с адреса загрузки бут-сектора!
-    PC = 0000000; 
+    PC = 0000000;     
+    
     run();
 }

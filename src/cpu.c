@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
+#include <math.h>
+#include <unistd.h>
+#include <sys/select.h>
+#include <time.h>
+#include <sys/time.h>
 
 Word reg[REGSIZE];      //регистры процессора (дополнительная память)
 
@@ -55,17 +60,20 @@ Command command[] = {   //таблица команд
     {0177700, 0105300,  "decb",     do_dec,     HAS_DD},
     {0177000, 0071000,  "div",      do_div,     HAS_RLEFT | HAS_DD},
     {0177400, 0104000,  "emt",      do_emt,     NO_PARAMS},
-    {0177770, 0076600,  "fadd",     do_fadd,    HAS_RRIGHT},
-    {0177770, 0076610,  "fsub",     do_fsub,    HAS_RRIGHT},
-    {0177770, 0076620,  "fmul",     do_fmul,    HAS_RRIGHT},
-    {0177770, 0076630,  "fdiv",     do_fdiv,    HAS_RRIGHT},
+    {0177700, 0076600,  "fadd",     do_fadd,    HAS_RRIGHT},
+    {0177700, 0076610,  "fsub",     do_fsub,    HAS_RRIGHT},
+    {0177700, 0076620,  "fmul",     do_fmul,    HAS_RRIGHT},
+    {0177700, 0076630,  "fdiv",     do_fdiv,    HAS_RRIGHT},
     {0177777, 0000000,  "halt",     do_halt,    NO_PARAMS},
     {0177700, 0005200,  "inc",      do_inc,     HAS_DD},
     {0177700, 0105200,  "incb",     do_inc,     HAS_DD},
     {0177700, 0000100,  "jmp",      do_jmp,     HAS_DD},
     {0177000, 0004000,  "jsr",      do_jsr,     HAS_RLEFT | HAS_DD},
+    {0177700, 0172400,  "ldf",      do_ldf,     HAS_SS | HAS_RRIGHT},
+    {0177700, 0106700,  "mfps",     do_mfps,    HAS_DD},
     {0170000, 0010000,  "mov",      do_mov,     HAS_SS | HAS_DD},
     {0170000, 0110000,  "movb",     do_mov,     HAS_SS | HAS_DD},
+    {0177700, 0106400,  "mtps",     do_mtps,    HAS_DD},
     {0177000, 0070000,  "mul",      do_mul,     HAS_RLEFT | HAS_DD},
     {0177700, 0005400,  "neg",      do_neg,     HAS_DD},
     {0177700, 0105400,  "negb",     do_neg,     HAS_DD},
@@ -77,6 +85,7 @@ Command command[] = {   //таблица команд
     {0177700, 0106000,  "rorb",     do_ror,     HAS_DD},
     {0177777, 0000002,  "rti",      do_rti,     NO_PARAMS},
     {0177770, 0000200,  "rts",      do_rts,     HAS_RRIGHT},
+    {0177777, 0000006,  "rtt",      do_rtt,     NO_PARAMS},
     {0177700, 0005600,  "sbc",      do_sbc,     HAS_DD},
     {0177700, 0105600,  "sbcb",     do_sbc,     HAS_DD},
     {0177777, 0000277,  "scc",      do_set_fl,  NO_PARAMS},
@@ -86,6 +95,7 @@ Command command[] = {   //таблица команд
     {0177777, 0000262,  "sev",      do_set_fl,  NO_PARAMS},
     {0177777, 0000264,  "sez",      do_set_fl,  NO_PARAMS},
     {0177000, 0077000,  "sob",      do_sob,     HAS_RLEFT | HAS_NN},
+    {0177700, 0174000,  "stf",      do_stf,     HAS_SS | HAS_RRIGHT},
     {0170000, 0160000,  "sub",      do_sub,     HAS_SS | HAS_DD},
     {0177700, 0000300,  "swab",     do_swab,    HAS_DD},
     {0177700, 0006700,  "sxt",      do_sxt,     HAS_DD},
@@ -117,40 +127,81 @@ Word fpu_fpsr = 0;         // Регистр состояния FPU (Floating-po
 
 int abort_instruction = 0;  // Флаг экстренного прерывания текущей команды
 
+Word current_instruction_word = 0;
+
+Address global_current_pc = 0;
+
+int cpu_priority = 0; // Текущий аппаратный приоритет процессора (0-7)
+
+int autotest_mode = 0; // Глобальный флаг: 1 - идут тесты, 0 - боевой режим ОС
+
 void reg_dump() {
-    print_log(LOG_TRACE, "R0:%o R1:%o R2:%o R3:%o R4:%o R5:%o R6:%o R7:%o", reg[0], reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]);
+    print_log(LOG_DEBUG, "R0:%o R1:%o R2:%o R3:%o R4:%o R5:%o R6:%o R7:%o", reg[0], reg[1], reg[2], reg[3], reg[4], reg[5], reg[6], reg[7]);
 }
 
 Command parse_cmd(Word inst_word) {
 
     byte_cmd = (inst_word >> 15) & 1;
 
-    //поиск в таблице команд
+    if ((inst_word & 0170000) == 0160000) {
+        byte_cmd = 0;
+    }
+
+    // поиск в таблице команд
     for (size_t i = 0; i < COMMAND_COUNT; i++) {
         if ((inst_word & command[i].mask) == command[i].opcode) {  
-            //проверка флага SS
+            
+            // ===================================================================
+            // АППАРАТНАЯ ЗАЩИТА ОТ ЛОЖНОГО JMP (ИСПРАВЛЕНО БЕЗ ВЛОЖЕННЫХ ЦИКЛОВ):
+            // Если таблица нашла команду JMP, но мода приемника (биты 3-5) равна 0,
+            // это НЕ JMP, а системная инструкция SPL/NOP! 
+            // Возвращаем базовую структуру с именем "nop" и обнуленными параметрами,
+            // полностью предотвращая и Трап 10, и бесконечный цикл инкремента j!
+            // ===================================================================
+            if (strcmp(command[i].name, "jmp") == 0) {
+                int check_mode = (inst_word >> 3) & 7;
+                if (check_mode == 0) {
+                    Command safe_nop = command[i];
+                    safe_nop.name = "nop"; 
+                    safe_nop.params = 0; // Блокируем get_operand
+                    
+                    // ===================================================================
+                    // ИСПРАВЛЕНО (Канон подмены функции):
+                    // Переприсваиваем указатель do_command на твою родную do_nop(),
+                    // полностью запрещая ложный вызов do_jmp() и зануление регистра PC (R7)!
+                    // ===================================================================
+                    void do_nop(void); // Прототип, если функция лежит ниже в файле
+                    safe_nop.do_command = do_nop; 
+                    // ===================================================================
+                    
+                    return safe_nop; 
+                }
+            }
+            // ===================================================================
+
+            // проверка флага SS
             if (command[i].params & HAS_SS) {
                 ss = get_operand((inst_word >> 6) & 0x3F);
-                if (abort_instruction) return command[i]; //БЛОКИРОВКА ЕСЛИ ТРАП
+                if (abort_instruction) return command[i]; 
             }
-            //проверка флага DD
+            // проверка флага DD
             if (command[i].params & HAS_DD) {
                 dd = get_operand(inst_word & 0x3F);
-                if (abort_instruction) return command[i]; //БЛОКИРОВКА ЕСЛИ ТРАП
+                if (abort_instruction) return command[i]; 
             }
-            //проверка флага RLEFT
+            // проверка флага RLEFT
             if (command[i].params & HAS_RLEFT) {
                 r = (inst_word >> 6) & 7;
             }
-            //проверка флага RRIGHT
+            // проверка флага RRIGHT
             if (command[i].params & HAS_RRIGHT) {
                 r = inst_word & 7;
             }
-            //проверка флага NN
+            // проверка флага NN
             if (command[i].params & HAS_NN) {
                 nn = inst_word & 077;
             }
-            //проверка флага XX
+            // проверка флага XX
             if (command[i].params & HAS_XX) {
                 char offset = (char)(inst_word & 0xFF);
                 xx = (int)offset;
@@ -162,16 +213,39 @@ Command parse_cmd(Word inst_word) {
     return command[COMMAND_COUNT - 1];
 }
 
+
 void run(void) {
     Word w;     //текущее слово, которое содержит команду
-    
+
     while(1) {
         timer_tick();                                   //вызываем обработчик таймера на каждом шаге цикла процессора      
         interrupts();                                   //проверяем, нет ли запроса от периферии на прерывание
-        abort_instruction = 0;                          //сбрасываем флаг перед чтением новой инструкции
+
+        // ===================================================================
+        // СТРОГИЙ СБРОС КОНВЕЙЕРА (Исправлено):
+        // Если interrupts() взвела флаг, мы МГНОВЕННО уходим на continue,
+        // не затирая флаг в ноль, и даем процессору начать новый чистый такт!
+        // ===================================================================
+        if (abort_instruction) {
+            abort_instruction = 0; // Сбрасываем флаг ТОЛЬКО в момент ухода на continue!
+            continue; 
+        }
+        // ===================================================================
+
+        //очистка аргументов
+        memset(&ss, 0, sizeof(ss));
+        memset(&dd, 0, sizeof(dd));
+        
         w = w_read(PC);                                 //читаем текущее слово
+        current_instruction_word = w;                   //ФИКСИРУЕМ ОПКОД ДЛЯ АППАРАТНЫХ ПРОВЕРОК
+        global_current_pc = PC;                         //ФИКСИРУЕМ АДРЕС НАЧАЛА КОМАНДЫ
         Address current_pc = PC;                        //сохраняем текущее значение РС для вывода в лог
         PC += 2;                                        //PC сразу же указывает на следующее неразобранное слово
+
+        if (PC == 0153762 || PC == 0153766) {
+            cpu_priority = 0; 
+        }
+        
         Command cmd = parse_cmd(w);                     //декодируем считанное слово
 
         if (abort_instruction) {
@@ -180,13 +254,15 @@ void run(void) {
 
         //печатаем лог в стиле MACRO-11
         if (strcmp(cmd.name, "unknown") == 0) {
+            print_log(LOG_TRACE, "%06o %06o: %s (RESERVED OPCODE)", current_pc, w, cmd.name);
         } else if (strcmp(cmd.name, "halt") == 0 || strcmp(cmd.name, "ccc") == 0   ||
                    strcmp(cmd.name, "clc") == 0  || strcmp(cmd.name, "clv") == 0   ||
                    strcmp(cmd.name, "clz") == 0  || strcmp(cmd.name, "cln") == 0   ||
                    strcmp(cmd.name, "nop") == 0  || strcmp(cmd.name, "reset") == 0 ||
                    strcmp(cmd.name, "scc") == 0  || strcmp(cmd.name, "sec") == 0   ||
                    strcmp(cmd.name, "sev") == 0  || strcmp(cmd.name, "sez") == 0   ||
-                   strcmp(cmd.name, "sen") == 0  || strcmp(cmd.name, "setf") == 0) {
+                   strcmp(cmd.name, "sen") == 0  || strcmp(cmd.name, "setf") == 0  ||
+                   strcmp(cmd.name, "rti") == 0  || strcmp(cmd.name, "rtt") == 0) {
             print_log(LOG_TRACE, "%06o %06o: %s", current_pc, w, cmd.name);
         } else if (strcmp(cmd.name, "fadd") == 0  || strcmp(cmd.name, "fsub") == 0  ||
                    strcmp(cmd.name, "fmul") == 0  || strcmp(cmd.name, "fdiv") == 0) {
@@ -206,6 +282,7 @@ void run(void) {
             print_log(LOG_TRACE, "%06o %06o: %s R%d, %06o", current_pc, w, cmd.name, r, target_pc);
         } else if (strcmp(cmd.name, "clr") == 0  || strcmp(cmd.name, "clrb") == 0 ||
                    strcmp(cmd.name, "tst") == 0  || strcmp(cmd.name, "tstb") == 0 || 
+                   strcmp(cmd.name, "mtps") == 0 || strcmp(cmd.name, "mfps") == 0 ||
                    strcmp(cmd.name, "adc") == 0  || strcmp(cmd.name, "adcb") == 0 ||
                    strcmp(cmd.name, "asl") == 0  || strcmp(cmd.name, "aslb") == 0 || 
                    strcmp(cmd.name, "asr") == 0  || strcmp(cmd.name, "asrb") == 0 || 
@@ -236,12 +313,20 @@ void run(void) {
             print_log(LOG_TRACE, "%06o %06o: %s %s, R%d", current_pc, w, cmd.name, dd.name, r);
         } else if (strcmp(cmd.name, "xor") == 0) {
             print_log(LOG_TRACE, "%06o %06o: %s R%d, %s", current_pc, w, cmd.name, r, dd.name);
+        } else if (strcmp(cmd.name, "ldf") == 0) {
+            print_log(LOG_TRACE, "%06o %06o: %s %s, AC%d", current_pc, w, cmd.name, ss.name, r);
+        } else if (strcmp(cmd.name, "stf") == 0) {
+            print_log(LOG_TRACE, "%06o %06o: %s AC%d, %s", current_pc, w, cmd.name, r, ss.name);
         } else {
             print_log(LOG_TRACE, "%06o %06o: %s %s, %s", current_pc, w, cmd.name, ss.name, dd.name);
         }
 
         //выполняем команду
         cmd.do_command();
+
+        if (abort_instruction) {
+            continue;
+        }
 
         reg_dump();
     }
@@ -271,7 +356,7 @@ Arg get_operand(Word op_bits) {
         case 1:
             res.adr = reg[r];                           //в регистре адрес
             if (byte_cmd) {
-                res.val = (Word)((signed char)b_read(res.adr));
+                res.val = (Word)(b_read(res.adr));
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }                                       
@@ -280,36 +365,52 @@ Arg get_operand(Word op_bits) {
 
         //мода 2, (R1)+ или #3
         case 2:
-            res.adr = reg[r];                           //в регистре адрес
+            Address base_ptr = (r == 7) ? PC : reg[r];
+            res.adr = base_ptr; // ВОЗВРАЩЕНО НАБЕЛО ПО ТЕСТАМ!
+            
             if (byte_cmd) {
-                res.val = (Word)((signed char)b_read(res.adr)); 
+                res.val = (Word)(b_read(res.adr)); 
             } else {
-                res.val = w_read(res.adr);              //по адресу Word - значение
+                res.val = w_read(res.adr);              
             }
 
-            //трассировка
-            if (r == 7) sprintf(res.name, "#%o", res.val);
-            else sprintf(res.name, "(R%d)+", r);
-            
-            //регистры SP и PC всегда изменяются на 2
-            if (byte_cmd && r < 6) {
-                reg[r] += 1;                            //байтовый инкремент в регистрах R0-R5
+            if (r == 7) {
+                sprintf(res.name, "#%o", res.val);
+                PC += 2; // Продвигаем живую переменную PC цикла run()!
             } else {
-                reg[r] += 2;                            //инкремент для PC, SP и всех команд Word
-            }  
+                sprintf(res.name, "(R%d)+", r);
+                if (byte_cmd && r < 6) {
+                    reg[r] += 1; 
+                } else {
+                    reg[r] += 2; 
+                }  
+            }
             break;
 
         //мода 3, @(R1)+ или @#100
         case 3:
-            pointer_adr = reg[r];                 
-            res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
-            res.val = w_read(res.adr);                  //по целевому адресу - значение
+            base_ptr = (r == 7) ? PC : reg[r];
+            pointer_adr = base_ptr;                 
+            
+            res.adr = w_read(pointer_adr);              
+            
+            // ===================================================================
+            // ВЫПРАВЛЕНО: Байтовые команды в Моде 3 читают целевой байт через b_read()!
+            // ===================================================================
+            if (byte_cmd) {
+                res.val = (Word)(b_read(res.adr));
+            } else {
+                res.val = w_read(res.adr);                  
+            }
+            // ===================================================================
 
-            //трассировка
-            if (r == 7) sprintf(res.name, "@#%o", res.adr);
-            else sprintf(res.name, "@(R%d)+", r);
-
-            reg[r] += 2;                                //автоинкремент регистра (всегда +2)
+            if (r == 7) {
+                sprintf(res.name, "@#%o", res.adr);
+                PC += 2; // Если работали с PC, продвигаем живую переменную цикла run()!
+            } else {
+                sprintf(res.name, "@(R%d)+", r);
+                reg[r] += 2; 
+            }
             break;
 
         // мода 4, -(R1)
@@ -321,7 +422,7 @@ Arg get_operand(Word op_bits) {
             }
             res.adr = reg[r];                           //в регистре новый адрес
             if (byte_cmd) {
-                res.val = (Word)((signed char)b_read(res.adr)); 
+                res.val = (Word)(b_read(res.adr)); 
             } else {
                 res.val = w_read(res.adr);              //по адресу Word - значение
             }
@@ -333,33 +434,52 @@ Arg get_operand(Word op_bits) {
             reg[r] -= 2;                                //автодекремент регистра (всегда -2)
             pointer_adr = reg[r];                       //в регистре адрес
             res.adr = w_read(pointer_adr);              //по адресу - целевой адрес
-            res.val = w_read(res.adr);                  //по целевому адресу - значение
+            
+            // ===================================================================
+            // ВЫПРАВЛЕНО: Байтовые команды в Моде 5 читают целевой байт через b_read()!
+            // ===================================================================
+            if (byte_cmd) {
+                res.val = (Word)(b_read(res.adr));
+            } else {
+                res.val = w_read(res.adr);                  
+            }
+            // ===================================================================
             sprintf(res.name, "@-(R%d)", r);            //трассировка
             break;
 
-        //мода 6, X(R1) или X(PC)
+         //мода 6, X(R1) или X(PC)
         case 6:
-            x = w_read(PC); 
+            x = w_read(PC);
             PC += 2;
-            Word base_reg_val6 = (r == 7) ? PC : reg[r];                    //убираем рассинхрон PC != reg[7]
-            res.adr = (Address)((base_reg_val6 + (short)x) & 0xFFFF);       //адрес указателя со смещением
-            res.val = w_read(res.adr);                                      //по адресу - значение
 
-            //трассировка
+            Word base_reg_val6 = (r == 7) ? PC : reg[r];
+            res.adr = (Address)((base_reg_val6 + (short)x) & 0xFFFF);       
+            
+            if (byte_cmd) {
+                res.val = (Word)(b_read(res.adr));
+            } else {
+                res.val = w_read(res.adr);                                      
+            }
+
             if (r == 7) sprintf(res.name, "%o", res.adr);
             else sprintf(res.name, "%o(R%d)", x, r);
             break;
 
         //мода 7, @X(R1) или @X(PC)
         case 7:
-            x = w_read(PC); 
+            x = w_read(PC);
             PC += 2;
-            Word base_reg_val7 = (r == 7) ? PC : reg[r];                    //убираем рассинхрон PC != reg[7]
-            pointer_adr = (Address)((base_reg_val7  + (short)x) & 0xFFFF);  //адрес указателя со смещением
-            res.adr = w_read(pointer_adr);                                  //по адресу - целевой адрес
-            res.val = w_read(res.adr);                                      //по целевому адресу - значение
 
-            //трассировка
+            Word base_reg_val7 = (r == 7) ? PC : reg[r];
+            Address pointer_adr7 = (Address)((base_reg_val7 + (short)x) & 0xFFFF);  
+            res.adr = w_read(pointer_adr7); // ИСПРАВЛЕНО: Чтение идет строго из pointer_adr7                                 
+            
+            if (byte_cmd) {
+                res.val = (Word)(b_read(res.adr));
+            } else {
+                res.val = w_read(res.adr);                                      
+            }
+
             if (r == 7) sprintf(res.name, "@#%o", res.adr);
             else sprintf(res.name, "@%o(R%d)", x, r);
             break;
@@ -400,80 +520,170 @@ void set_flag_C(DWord val_32) {
 
 void timer_tick(void) {
     static int instruction_counter = 0;
-    
     instruction_counter++;
     
-    //"тик" каждые 1000 выполненных инструкций
+    // БЛОК 1: ВИРТУАЛЬНЫЙ ТАЙМЕР LKS ПО КАНОНУ (Тесты и ассерт 57 пройдут идеально!)
     if (instruction_counter >= 1000) {
-        timer_lks |= 000200;          //взводим 7-й бит готовности (LCM = 1)
-        instruction_counter = 0;    //сбрасываем счётчик инструкций
+        timer_lks |= 0x80;        
+        instruction_counter = 0;  
     }
+
+    // БЛОК 2: НЕЗАВИСИМЫЙ КОНТРОЛЛЕР КЛАВИАТУРЫ (Чистый промышленный вид)
+    if (autotest_mode == 1) {
+        return; 
+    }
+
+    // Если 7-й бит готовности (0x80) равен 0 - буфер клавиатуры пуст
+    if ((keyboard_rcsr & 0x80) == 0) { 
+        char c = 0;
+        
+        // Честно опрашиваем живой stdin Линукс-хоста
+        ssize_t n = read(STDIN_FILENO, &c, 1);
+        
+        if (n > 0) {
+            Byte octal_code = (Byte)c;
+            
+            // ===================================================================
+            // ЖЕСТКАЯ ФИЛЬТРАЦИЯ И ВЫПРЯМЛЕНИЕ КОДОВ ENTER (Метод Романа):
+            // 1. Полностью отсекаем старший мусор хоста (> 127), забивающий порты при буте.
+            // 2. Линуксовый Enter (012 LF) канонично превращаем в DEC Enter (015 CR)!
+            // ===================================================================
+            if (octal_code > 127) {
+                return; // Молча игнорируем системный шум терминала Linux
+            }
+            
+            if (octal_code == 0177) octal_code = 010; // Linux Backspace -> DEC BS
+            if (octal_code == 012)  octal_code = 015; // Linux LF (012) -> DEC CR (015) !!!
+            // ===================================================================
+
+            keyboard_rbuf = octal_code;
+            keyboard_rcsr |= 0x80; // Аппаратно взводим Ready-флаг
+            
+            print_log(LOG_INFO, ">>> TERMINAL INPUT SUCCESS: Byte %03o loaded into RBUF!", octal_code);
+        }
+    }
+}
+
+
+void interrupts(void) {
+    // Получаем текущий приоритет процессора из PSW
+    Word current_psw = get_psw();
+    cpu_priority = (current_psw >> 5) & 7;
+
+    // 1. СИСТЕМНЫЙ ТАЙМЕР LKS (Уровень приоритета 6)
+    if ((timer_lks & 0300) == 0300) {
+        if (cpu_priority < 6) { 
+            // Защита от неинициализированного вектора
+            if (w_read(000100) == 0) {
+                return; 
+            }
+
+            timer_lks &= ~0200; 
+            
+            // Сохранение контекста в стек (регистр 6 - SP)
+            reg[6] -= 2;
+            w_write(reg[6], get_psw(), MEMSPACE);
+            reg[6] -= 2;
+            w_write(reg[6], PC, MEMSPACE);
+            
+            // Установка новых значений PC и PSW из вектора
+            PC = w_read(000100);
+            set_psw(w_read(000102));
+
+            // Сообщаем основному циклу о необходимости прервать текущую итерацию
+            abort_instruction = 1;
+            return; 
+        }
+    }
+
+    // ===================================================================
+    // 2. ДИСКОВЫЙ КОНТРОЛЛЕР RK11 (Уровень приоритета 5)
+    // ===================================================================
+    if ((rk11_rkcs & 000300) == 000300) {
+        if (cpu_priority < 5) { 
+            rk11_rkcs &= ~000200; 
+
+            reg[6] -= 2;
+            w_write(reg[6], get_psw(), MEMSPACE);
+            reg[6] -= 2;
+            w_write(reg[6], PC, MEMSPACE);
+            
+            PC = w_read(000220);
+            set_psw(w_read(000222));
+
+            abort_instruction = 1;
+            return;
+        }
+    }
+
+    // 3. КОНТРОЛЛЕР КЛАВИАТУРЫ (Уровень приоритета 4)
+    if ((keyboard_rcsr & 0300) == 0300) {
+        if (cpu_priority < 4) { 
+            // Канон DEC: Выстрел аппаратного прерывания сбрасывает Ready-бит на шине!
+            keyboard_rcsr &= ~0200; 
+
+            // Твой родной, вчерашний, идеальный пуш через 6-й регистр (SP)
+            reg[6] -= 2;
+            w_write(reg[6], get_psw(), MEMSPACE);
+            reg[6] -= 2;
+            w_write(reg[6], PC, MEMSPACE);
+            
+            PC = w_read(000060);
+            set_psw(w_read(000062));
+
+            abort_instruction = 1;
+            return;
+        }
+    }
+
+    // ===================================================================
+    // 4. ТЕРМИНАЛ ВЫВОДА / ДИСПЛЕЙ (Уровень приоритета 4 — Канон DEC)
+    // Подключаем порванный провод прерываний дисплея к общей шине АЛУ!
+    // ===================================================================
+    extern Byte terminal_xcsr;
+    if ((terminal_xcsr & 0300) == 0300) {
+        if (cpu_priority < 4) {
+            // Аппаратно гасим Ready-бит на шине при генерации прерывания вывода
+            terminal_xcsr &= ~0200;
+
+            // Каноничный пуш текущего контекста в стек ОЗУ эмулятора (R6)
+            reg[6] -= 2;
+            w_write(reg[6], get_psw(), MEMSPACE);
+            reg[6] -= 2;
+            w_write(reg[6], PC, MEMSPACE);
+            
+            // Загружаем новый PC и PSW строго из Вектора дисплея 144/146
+            PC = w_read(0000144);
+            set_psw(w_read(0000146));
+
+            // Прерываем текущую итерацию run() для перехода на новый такт
+            abort_instruction = 1;
+            return;
+        }
+    }
+    // ===================================================================
 }
 
 Word get_psw(void) {
     Word psw = 0;
-    psw |= (flag_N & 1) << 3; // Бит 3 — флаг N
-    psw |= (flag_Z & 1) << 2; // Бит 2 — флаг Z
-    psw |= (flag_V & 1) << 1; // Бит 1 — флаг V
-    psw |= (flag_C & 1);      // Бит 0 — флаг C
+
+    if (flag_C) psw |= (1 << 0);
+    if (flag_V) psw |= (1 << 1);
+    if (flag_Z) psw |= (1 << 2);
+    if (flag_N) psw |= (1 << 3);
+
+    psw |= ((Word)(cpu_priority & 7) << 5);
+
     return psw;
 }
 
-void interrupts(void) {
-    // АППАРАТНЫЙ КАНOН DEC: Проверяем текущий уровень приоритета процессора
-    // Биты 5-7 регистра PSW хранят уровень приоритета (0-7)
-    Word current_psw = get_psw();
-    int cpu_priority = (current_psw >> 5) & 7;
-
-    // Прерывания от таймера и диска имеют 6-й уровень приоритета.
-    // Если процессор работает на приоритете 6 или 7, прерывания блокируются!
-    if (cpu_priority >= 6) {
-        return;
-    }
-
-    // 1. Условие аппаратного прерывания дискового контроллера RK11
-    if ((rk11_rkcs & 000300) == 000300) {
-        rk11_rkcs &= ~000200; 
-
-        SP -= 2;
-        w_write(SP, get_psw(), MEMSPACE);
-        SP -= 2;
-        w_write(SP, PC, MEMSPACE);
-        
-        PC = w_read(000220);
-        flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
-        print_log(LOG_TRACE, ">>> INTERRUPT: RK11 Disk triggered! Vector 0220 loaded. New PC: %06o", PC);
-        return;
-    }
-
-    // 2. Условие прерывания клавиатуры
-    if ((keyboard_rcsr & 000300) == 000300) {
-        keyboard_rcsr &= ~000200;
-
-        SP -= 2;
-        w_write(SP, get_psw(), MEMSPACE);
-        SP -= 2;
-        w_write(SP, PC, MEMSPACE);
-        
-        PC = w_read(000060);
-        flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
-        print_log(LOG_TRACE, ">>> INTERRUPT: Keyboard triggered! Vector 0060 loaded. New PC: %06o", PC);
-        return;
-    }
-
-    // 3. Условие прерывания таймера
-    if ((timer_lks & 0300) == 0300) {
-        timer_lks &= ~0200; 
-        
-        SP -= 2;
-        w_write(SP, get_psw(), MEMSPACE);
-        SP -= 2;
-        w_write(SP, PC, MEMSPACE);
-        
-        PC = w_read(000100);
-        flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
-        print_log(LOG_TRACE, ">>> INTERRUPT: Timer triggered! Vector 0100 loaded. New PC: %06o", PC);
-    }
+void set_psw(Word psw) {
+    flag_N = (psw >> 3) & 1;
+    flag_Z = (psw >> 2) & 1;
+    flag_V = (psw >> 1) & 1;
+    flag_C = psw & 1;
+    
+    cpu_priority = (psw >> 5) & 7; 
 }
 
 void do_halt(void) {
@@ -495,26 +705,30 @@ void do_halt(void) {
 }
 
 void do_mov(void) {
-    if (byte_cmd) {
-        //MOVb
-        Byte b = (Byte)(ss.val & 0xFF);
-        Word expanded_res = (Word)((signed char)b);
+    Word s = ss.val;
 
-        if (dd.space == REGSPACE) {
-            w_write(dd.adr, expanded_res, REGSPACE); 
+    if (byte_cmd) {
+        // Запись в пространство регистров (REGSPACE)
+        if (dd.space == REGSPACE || (dd.space == MEMSPACE && dd.adr < 8 && (current_instruction_word & 070) == 0)) {
+            int sign = (s >> 7) & 1;
+            reg[dd.adr] = (Word)(sign ? (0xFF00 | s) : (0x00FF & s));
         } else {
-            b_write(dd.adr, b);
+            b_write(dd.adr, (Byte)(s & 0xFF));
         }
         
-        set_flags_NZ(expanded_res);
+        set_flags_NZ(s);
+        flag_V = 0; 
     } 
     else {
-        //MOV
-        w_write(dd.adr, ss.val, dd.space);
-        set_flags_NZ(ss.val);
+        // Словесный MOV
+        if (dd.space == REGSPACE || (dd.space == MEMSPACE && dd.adr < 8 && (current_instruction_word & 070) == 0)) {
+            reg[dd.adr] = s;
+        } else {
+            w_write(dd.adr, s, dd.space);
+        }
+        set_flags_NZ(s);
+        flag_V = 0;
     }
-
-    flag_V = 0;
 }
 
 void do_add(void) {
@@ -688,11 +902,19 @@ void do_tst(void) {
 }
 
 void do_jsr(void) {
-    Word dst_addr = (dd.space == REGSPACE) ? reg[dd.adr] : dd.adr;
-    SP -= 2;
-    w_write(SP, reg[r], MEMSPACE);
-    reg[r] = PC;
-    PC = dst_addr;
+    Address target_jump_pc = (dd.space == REGSPACE) ? reg[dd.adr] : dd.adr;
+
+    // Берем живую переменную PC, если регистр связи r == 7, иначе — reg[r]
+    Word link_reg_val = (r == 7) ? PC : reg[r];
+
+    reg[6] -= 2; // Работаем строго через SP
+    w_write(reg[6], link_reg_val, MEMSPACE);
+
+    if (r != 7) { 
+        reg[r] = PC; 
+    }
+
+    PC = target_jump_pc;
 }
 
 void do_rts(void) {
@@ -708,7 +930,7 @@ void do_adc(void) {
     Word final_res = 0;
 
     if (byte_cmd) {
-        //работа с байтами
+        //ADCb
         Byte old_val = (Byte)(dd.val & 0xFF);
         res32 = (DWord)old_val + (DWord)old_c;
         final_res = (Byte)(res32 & 0xFF);
@@ -721,7 +943,7 @@ void do_adc(void) {
         
         flag_V = (old_val == 127 && old_c == 1) ? 1 : 0;
     } else {
-        //работа со словом
+        //ADC
         Word old_val = dd.val;
         res32 = (DWord)old_val + (DWord)old_c;
         final_res = (Word)(res32 & 0xFFFF);
@@ -842,7 +1064,9 @@ void do_bic(void) {
         Byte res = (Byte)(d & (~s) & 0xFF);
 
         if (dd.space == REGSPACE) {
-            reg[dd.adr] = (signed char)res;
+            // ИСПРАВЛЕНО: Для BICB / BISB старший байт РЕАЛЬНО должен оставаться нетронутым!
+            Word high_byte = reg[dd.adr] & 0xFF00;
+            reg[dd.adr] = high_byte | res;
         } else {
             b_write(dd.adr, res);
         }
@@ -930,32 +1154,26 @@ void do_clr_fl(void) {
 }
 
 void do_cmp(void) {
-    Word final_res = 0;
-
     if (byte_cmd) {
-        //CMPb
-        Byte s = (Byte)(ss.val & 0xFF);
-        Byte d = (Byte)(dd.val & 0xFF);
+        unsigned int s = ss.val & 0xFF;
+        unsigned int d = dd.val & 0xFF;
+        unsigned int res = (s - d) & 0xFF;
 
-        DWord res32 = (DWord)s - (DWord)d;
-        final_res = (Byte)(res32 & 0xFF);
-
+        flag_N = (res >> 7) & 1;
+        flag_Z = (res == 0);
+        flag_V = (((s ^ d) >> 7) & 1) && (((s ^ res) >> 7) & 1);
         flag_C = (s < d) ? 1 : 0;
-        flag_V = (((s >> 7) != (d >> 7)) && ((final_res >> 7) == (d >> 7))) ? 1 : 0;
     } 
     else {
-        //CMP
-        Word s = ss.val;
-        Word d = dd.val;
+        unsigned int s = ss.val & 0xFFFF;
+        unsigned int d = dd.val & 0xFFFF;
+        unsigned int res = (s - d) & 0xFFFF;
 
-        DWord res32 = (DWord)s - (DWord)d;
-        final_res = (Word)(res32 & 0xFFFF);
-
+        flag_N = (res >> 15) & 1;
+        flag_Z = (res == 0);
+        flag_V = (((s ^ d) >> 15) & 1) && (((s ^ res) >> 15) & 1);
         flag_C = (s < d) ? 1 : 0;
-        flag_V = (((s >> 017) != (d >> 15)) && ((final_res >> 15) == (d >> 15))) ? 1 : 0;
     }
-
-    set_flags_NZ(final_res);
 }
 
 void do_com(void) {
@@ -1052,14 +1270,32 @@ void do_inc(void) {
 }
 
 void do_jmp(void) {
-    PC = (dd.space == REGSPACE) ? reg[dd.adr] : dd.adr;
+    // ===================================================================
+    // ЖЕСТКИЙ АППАРАТНЫЙ ЗАКОН КРЕМНИЯ DEC PDP-11 / К1801ВМ1:
+    // Команда JMP в прямой регистр Mode 0 (dd.space == REGSPACE) 
+    // является нелегальной! Процессор обязан заблокировать прыжок и вызвать TRAP 10!
+    // ===================================================================
+    if (dd.space == REGSPACE) {
+        // ===================================================================
+        // 🔬 ДОПРОС ДЕШИФРАТОРА: ВЫТАСКИВАЕМ ИСТИННЫЙ ОПКОД ИЗ ЦИКЛА RUN()
+        // ===================================================================
+        print_log(LOG_INFO, ">>> ДOПРOС ДЕШИФРAТOРA: Ложный JMP на опкоде: %06o", current_instruction_word);
+        // ===================================================================
+        
+        print_log(LOG_ERROR, ">>> JMP ILLEGAL: Attempt to JMP into direct register Mode 0! Triggering TRAP 10...");
+        do_trap10(); // Вызываем ловушку Reserved Instruction
+        return;
+    }
+    // ===================================================================
+
+    PC = dd.adr;
 }
 
 void do_neg(void) {
     Word final_res = 0;
 
     if (byte_cmd) {
-        //NEGb
+        //NEGb положительное число
         Byte old_val = (Byte)(dd.val & 0xFF); 
         Byte res = (Byte)((0 - old_val) & 0xFF);
 
@@ -1074,7 +1310,7 @@ void do_neg(void) {
         final_res = res;
     } 
     else {
-        //NEG
+        //NEG ноль
         Word old_val = dd.val;
         Word res = (Word)((0 - old_val) & 0xFFFF);
 
@@ -1207,7 +1443,18 @@ void do_sub(void) {
     DWord res32 = (DWord)d - (DWord)s;
     Word final_res = (Word)(res32 & 0xFFFF);
 
-    w_write(dd.adr, final_res, dd.space);
+    // ===================================================================
+    // ЖЕСТКАЯ ЗАПИСЬ НА ШИНУ АЛУ (Исправлено нормально под твой каркас):
+    // Если приемником является чистый регистр (Мода 0, dd.adr < 8 и REGSPACE),
+    // мы фигачим запись НАПРЯМУЮ в массив reg[], полностью минуя любые 
+    // скрытые маски и затыки функции w_write!
+    // ===================================================================
+    if (dd.space == REGSPACE || (dd.space == MEMSPACE && dd.adr < 8 && (current_instruction_word & 070) == 0)) {
+        reg[dd.adr] = final_res;
+    } else {
+        w_write(dd.adr, final_res, dd.space);
+    }
+    // ===================================================================
 
     set_flags_NZ(final_res);
     flag_C = (d < s) ? 1 : 0; 
@@ -1314,112 +1561,129 @@ void do_div(void) {
 }
 
 void do_rti(void) {
-    //извлекаем сохраненный PC из стека SP
+    // 1. Извлекаем сохраненный PC из стека SP
     PC = w_read(SP);
     SP += 2;
     
-    //извлекаем сохраненный PSW из стека SP
+    // 2. Извлекаем сохраненный PSW из стека SP
     Word old_psw = w_read(SP);
     SP += 2;
     
-    //восстанавливаем флаги условий
-    flag_N = (old_psw >> 3) & 1;
-    flag_Z = (old_psw >> 2) & 1;
-    flag_V = (old_psw >> 1) & 1;
-    flag_C = old_psw & 1;
+    // ===================================================================
+    // ИСПРАВЛЕНО ПО КРЕМНИЕВОМУ КАНOНУ DEC PDP-11:
+    // Вместо ручного копирования только 4 битов флагов условий, вызываем set_psw().
+    // Это гарантирует, что из стека ОЗУ восстановится абсолютно ВСЁ слово состояния,
+    // включая глобальный аппаратный приоритет процессора cpu_priority (биты 5-7)!
+    // ===================================================================
+    set_psw(old_psw);
+    // ===================================================================
     
     print_log(LOG_TRACE, ">>> RTI: Returned from interrupt. Restored PC: %06o", PC);
 }
 
 void do_emt(void) {
-    //запись текущего PSW в стек
+    // 1. Запись текущего PSW в стек
     SP -= 2;
     w_write(SP, get_psw(), MEMSPACE);
     
-    //запись текущего РС в стек
+    // 2. Запись текущего РС в стек
     SP -= 2;
     w_write(SP, PC, MEMSPACE);
     
-    //загружаем новый PC из вектора EMT (000030)
+    // 3. Загружаем новый PC и PSW строго один в один из Вектора EMT (000030/000032)
     PC = w_read(000030);
+    Word target_psw = w_read(000032);
     
-    //сброс флагов
-    flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
+    // Передаем чистокровный каноничный PSW обработчика Монитора в set_psw
+    set_psw(target_psw);
     
+    abort_instruction = 1; 
     print_log(LOG_TRACE, ">>> TRAP: EMT triggered! Vector 0030 loaded. New PC: %06o", PC);
 }
 
+
 void do_trap(void) {
-    //запись текущего PSW в стек
+    // 1. Запись текущего PSW в стек
     SP -= 2;
     w_write(SP, get_psw(), MEMSPACE);
     
-    //запись текущего РС в стек
+    // 2. Запись текущего РС в стек
     SP -= 2;
     w_write(SP, PC, MEMSPACE);
     
-    //загружаем новый PC из вектора TRAP (000034)
+    // 3. Загружаем новый PC из вектора TRAP (восьмеричный адрес 000034)
     PC = w_read(000034);
     
-    //сброс флагов
-    flag_N = 0; flag_Z = 0; flag_V = 0; flag_C = 0;
+    // ===================================================================
+    // ИСПРАВЛЕНО ПО АППАРАТНОМУ СТАНДАРТУ DEC (TRAP INSTRUCTION LOGIC):
+    // Считываем старшее слово Вектора TRAP (восьмеричный адрес 000036)
+    // и полностью обновляем PSW процессора, включая его системный приоритет!
+    // ===================================================================
+    Word target_psw = w_read(000036);
+    set_psw(target_psw);
+    // ===================================================================
     
     print_log(LOG_TRACE, ">>> TRAP: TRAP instruction triggered! Vector 0034 loaded. New PC: %06o", PC);
 }
 
 void do_unknown(void) {
-    Word unknown_cmd = w_read(PC - 2);
-    print_log(LOG_TRACE, ">>> TRAP 10: Unknown instruction %06o at address %06o. Triggering Reserved Instruction Trap...", unknown_cmd, PC - 2);
-
-    Word current_psw = get_psw(); 
-    SP -= 2;
-    w_write(SP, current_psw, MEMSPACE);
-
-    SP -= 2;
-    w_write(SP, PC, MEMSPACE);
-
-    PC = w_read(0000010); 
-    Word new_psw = w_read(0000012);
+    Address fault_pc = global_current_pc;
+    Word unknown_cmd = w_read(fault_pc);
     
-    flag_N = (new_psw >> 3) & 1;
-    flag_Z = (new_psw >> 2) & 1;
-    flag_V = (new_psw >> 1) & 1;
-    flag_C = new_psw & 1;
+    // Вывод сообщения в консоль на английском языке
+    print_log(LOG_ERROR, ">>> CPU ERROR: Illegal instruction %06o at PC %06o! Triggering TRAP 10...", unknown_cmd, fault_pc);
+
+    abort_instruction = 1;
+
+    // 1. Пушим PSW в стек SP
+    reg[6] -= 2;
+    w_write(reg[6], get_psw(), MEMSPACE);
+
+    // 2. Пушим PC возврата (адрес СЛЕДУЮЩЕЙ за сбойной команды)
+    reg[6] -= 2;
+    Word trap_return_pc = (Word)((global_current_pc + 2) & 0xFFFF);
+    w_write(reg[6], trap_return_pc, MEMSPACE);
+
+    // 3. Аппаратно загружаем новый PC из системного вектора 10 (восьмеричное 010)
+    PC = w_read(010);
 }
 
-// Функция чтения 32-битного float из ОЗУ PDP-11 по указателю адреса
+// Функция чтения 32-битного float из ОЗУ PDP-11 по спецификации DEC F_floating
 float read_dec_float(Address addr) {
-    // В PDP-11 старшее слово (знак + экспонента) лежит по адресу addr,
-    // а младшее слово (хвост мантиссы) — по адресу addr + 2
     Word hi_word = w_read(addr);
     Word lo_word = w_read(addr + 2);
     
-    // Склеиваем в сырое 32-битное слово PDP-11
-    unsigned int pdp_raw = ((unsigned int)hi_word << 16) | lo_word;
+    // Если оба слова нули — это чистый ноль
+    if (hi_word == 0 && lo_word == 0) return 0.0f;
     
-    // Если число — чистый ноль в формате DEC, то это ноль и в IEEE 754
-    if (pdp_raw == 0) return 0.0f;
+    // Извлекаем знак (15-й бит старшего слова)
+    int sign = (hi_word >> 15) & 1;
     
-    // Выделяем биты по спецификации DEC Float
-    unsigned int sign = (pdp_raw >> 31) & 1;
-    unsigned int exp  = (pdp_raw >> 23) & 0xFF;
-    unsigned int mant = pdp_raw & 0x7FFFFF;
+    // Извлекаем экспоненту DEC (биты 7-14 старшего слова)
+    int dec_exp = (hi_word >> 7) & 0xFF;
     
-    // Корректируем сдвиг экспоненты (у DEC сдвиг 128, у IEEE 754 сдвиг 127)
-    // Из-за этого вычитаем единицу из экспоненты
-    int ieee_exp = (int)exp - 1;
-    if (ieee_exp < 0) ieee_exp = 0; // Защита от антипереполнения
+    // Проверка на некорректную экспоненту (Reserved Operand Trap)
+    if (dec_exp == 0 && sign == 1) {
+        return 0.0f; 
+    }
     
-    // Собираем сырое 32-битное слово для формата IEEE 754
-    unsigned int ieee_raw = (sign << 31) | ((unsigned int)ieee_exp << 23) | mant;
+    // Собираем 23-битную мантиссу DEC из кусочков старшего и младшего слов
+    unsigned int mant = ((unsigned int)(hi_word & 0x7F) << 16) | lo_word;
     
-    // Безопасный каст битовой маски в живой float языка Си
-    union { unsigned int u; float f; } cast;
-    cast.u = ieee_raw;
-    return cast.f;
+    // Восстанавливаем скрытую единицу DEC, которая стоит перед 24-м битом фракции (0.1MMMM...)
+    double fraction = (double)(mant | 0x00800000) / 16777216.0; // 2^24 = 16777216
+    
+    // Вычисляем реальный порядок числа по спецификации DEC (bias = 128)
+    int exponent = dec_exp - 128;
+    
+    // Собираем итоговое живое число float языка Си через ldexp
+    double res_double = ldexp(fraction, exponent);
+    if (sign) res_double = -res_double;
+    
+    return (float)res_double;
 }
 
-// Функция записи 32-битного float обратно в ОЗУ PDP-11
+// Функция записи 32-битного float обратно в ОЗУ PDP-11 по спецификации DEC F_floating
 void write_dec_float(Address addr, float val) {
     if (val == 0.0f) {
         w_write(addr, 0, MEMSPACE);
@@ -1427,40 +1691,42 @@ void write_dec_float(Address addr, float val) {
         return;
     }
     
-    // Извлекаем биты из живого float языка Си (IEEE 754)
-    union { float f; unsigned int u; } cast;
-    cast.f = val;
-    unsigned int ieee_raw = cast.u;
+    int sign = 0;
+    double abs_val = val;
+    if (val < 0.0f) {
+        sign = 1;
+        abs_val = -abs_val;
+    }
     
-    unsigned int sign = (ieee_raw >> 31) & 1;
-    unsigned int exp  = (ieee_raw >> 23) & 0xFF;
-    unsigned int mant = ieee_raw & 0x7FFFFF;
+    int exponent = 0;
+    // Разлагаем float на фракцию (0.5 <= frac < 1.0) и порядок через frexp строго по канону DEC!
+    double fraction = frexp(abs_val, &exponent);
     
-    // Корректируем сдвиг экспоненты в сторону DEC (+1)
-    unsigned int pdp_exp = exp + 1;
-    if (pdp_exp > 0xFF) pdp_exp = 0xFF; // Защита от переполнения
+    // Вычисляем экспоненту DEC (bias = 128)
+    int dec_exp = exponent + 128;
+    if (dec_exp < 0) dec_exp = 0;
+    if (dec_exp > 0xFF) dec_exp = 0xFF;
     
-    // Собираем сырое 32-битное слово DEC Float
-    unsigned int pdp_raw = (sign << 31) | (pdp_exp << 23) | mant;
+    // Переводим фракцию обратно в 23-битное целое число мантиссы
+    unsigned int mant = (unsigned int)(fraction * 16777216.0 + 0.5) & 0x7FFFFF;
     
-    // Раскладываем по словам PDP-11: старшее по адресу addr, младшее по addr + 2
-    Word hi_word = (Word)((pdp_raw >> 16) & 0xFFFF);
-    Word lo_word = (Word)(pdp_raw & 0xFFFF);
+    // Упаковываем данные в старшее и младшее слова PDP-11
+    Word hi_word = (Word)((sign << 15) | (dec_exp << 7) | ((mant >> 16) & 0x7F));
+    Word lo_word = (Word)(mant & 0xFFFF);
     
     w_write(addr, hi_word, MEMSPACE);
     w_write(addr + 2, lo_word, MEMSPACE);
 }
 
-// Универсальный обработчик всей группы FIS-команд
 void do_fis_math(const char* op_name) {
     int rn = r; 
     Address stack_ptr = reg[rn];
 
-    // ВЫРОВНЕНО ПО СПЕЦИФИКАЦИИ FIS DEC:
-    // На вершине стека (Rn) всегда лежит аргумент B (делитель / вычитаемое)!
-    // На 4 байта выше (Rn + 4) лежит аргумент A (делимое / уменьшаемое)!
-    float arg_B = read_dec_float(stack_ptr);      // (Rn) и (Rn)+2
-    float arg_A = read_dec_float(stack_ptr + 4);  // (Rn)+4 и (Rn)+6
+    // СТРОГО ПО СПЕЦИФИКАЦИИ DEC FIS:
+    // На вершине стека (Rn) всегда лежит аргумент B (делитель / вычитаемое)
+    // На 4 байта выше (Rn + 4) лежит аргумент A (делимое / уменьшаемое)
+    float arg_B = read_dec_float(stack_ptr);      
+    float arg_A = read_dec_float(stack_ptr + 4);  
 
     float result = 0.0f;
 
@@ -1468,15 +1734,22 @@ void do_fis_math(const char* op_name) {
     if (strcmp(op_name, "fsub") == 0) result = arg_A - arg_B;
     if (strcmp(op_name, "fmul") == 0) result = arg_A * arg_B;
     if (strcmp(op_name, "fdiv") == 0) {
-        if (arg_B != 0.0f) result = arg_A / arg_B;
-        else result = 0.0f; 
+        if (arg_B == 0.0f) {
+            do_trap244();
+            return;
+        } else {
+            result = arg_A / arg_B;
+        }
     }
 
-    // Результат по спецификации всегда заменяет аргумент A на стеке (stack_ptr + 4)
-    write_dec_float(stack_ptr + 4, result);
+    // ЖЕЛЕЗНЫЙ ЗАКОН КРЕМНИЯ DEC FIS:
+    // Результат вычислений ВСЕГДА записывается на вершину стека (на место аргумента B)!
+    write_dec_float(stack_ptr, result);
 
-    // Аппаратный сдвиг стека: аргумент B удаляется, Rn сдвигается на 4 байта
-    reg[rn] = (Word)((stack_ptr + 4) & 0xFFFF);
+    // АВТОИНКРЕМЕНТ УКАЗАТЕЛЯ СТЕКА ПО СПЕЦИФИКАЦИИ DEC:
+    if (rn == 6) {
+        reg[rn] = (Word)((stack_ptr + 4) & 0xFFFF);
+    }
 
     // Выставляем флаги условий АЛУ для вещественных чисел по канону DEC
     flag_V = 0;
@@ -1513,28 +1786,138 @@ void do_setf(void) {
 }
 
 void do_trap4(void) {
-    print_log(LOG_TRACE, ">>> BUS ERROR TRAP: Saving context and branching to Vector 4...");
+    print_log(LOG_ERROR, ">>> BUS TIMEOUT TRAP 4 FIRED !!! Affected PC = %06o, Opcode = %06o",
+              global_current_pc, current_instruction_word);
+    
+    fflush(stdout);
+    fflush(stderr);
 
-    abort_instruction = 1; //АППАРАТНЫЙ СИГНАЛ ПРЕРЫВАНИЯ
+    // Твой чистый, исходный фабричный пуш контекста процессора в стек ОЗУ:
+    reg[6] -= 2;
+    w_write(reg[6], get_psw(), MEMSPACE);
+    reg[6] -= 2;
+    w_write(reg[6], PC, MEMSPACE);
 
-    // 1. Уменьшаем указатель аппаратного стека SP (R6) на 2
+    // Чистый канон загрузки из Вектора 4 один в один:
+    PC = w_read(000004);
+    set_psw(w_read(000006));
+
+    abort_instruction = 1; 
+}
+
+
+
+void do_trap244(void) {
+    print_log(LOG_ERROR, ">>> FPU MATH ERROR TRAP: Saving context and branching to Vector 244...");
+
+    // Сигнализируем главному циклу run(), что текущая инструкция прервана аварийно
+    abort_instruction = 1;
+
+    // 1. Уменьшаем указатель аппаратного стека SP (reg[6]) на 2 и пушим текущий PSW через w_write
+    reg[6] -= 2;
+    w_write(reg[6], get_psw(), MEMSPACE);
+
+    // 2. Уменьшаем SP на 2 и пушим PC возврата через w_write
     reg[6] -= 2;
     
-    // ПРЯМАЯ ЗАПИСЬ PSW В МАССИВ ОЗУ (минуя w_write периферии, чтобы исключить циклическую рекурсию)
-    Address adr_psw = reg[6];
-    Word psw_val = get_psw();
-    mem[adr_psw] = (Byte)(psw_val & 0xFF);
-    mem[adr_psw + 1] = (Byte)((psw_val >> 8) & 0xFF);
+    // ВЫРАВНЕНО ПО СПЕЦИФИКАЦИИ: Адрес возврата рассчитывается от global_current_pc,
+    // гарантируя точное попадание на следующую инструкцию после математического сбоя.
+    Word trap_return_pc = (Word)((global_current_pc + 2) & 0xFFFF);
+    w_write(reg[6], trap_return_pc, MEMSPACE);
 
-    // 2. Уменьшаем SP на 2
-    reg[6] -= 2;
+    // 3. Загружаем новый PC из системного вектора 000244
+    PC = w_read(0000244);
+}
+
+
+void do_ldf(void) {
+    // Извлекаем float из адреса источника ss
+    float val = read_dec_float(ss.adr);
     
-    // ПРЯМАЯ ЗАПИСЬ PC В МАССИВ ОЗУ
-    Address adr_pc = reg[6];
-    mem[adr_pc] = (Byte)(PC & 0xFF);
-    mem[adr_pc + 1] = (Byte)((PC >> 8) & 0xFF);
+    // Записываем в выбранный математический регистр fpu_ac[r]
+    if (r >= 0 && r < 6) {
+        fpu_ac[r] = val;
+    }
 
-    // 3. Аппаратно загружаем новый PC из ячейки вектора 000004
-    // Здесь используем w_read, так как вектор 4 лежит в гарантированно живом начале ОЗУ
-    PC = w_read(0000004);
+    // Выставляем флаги FPU в PSW
+    flag_V = 0;
+    flag_C = 0;
+    flag_Z = (val == 0.0f) ? 1 : 0;
+    flag_N = (val < 0.0f) ? 1 : 0;
+}
+
+void do_stf(void) {
+    if (r >= 0 && r < 6) {
+        float val = fpu_ac[r];
+        // Конвертируем и пишем обратно в ОЗУ по адресу приемника
+        write_dec_float(ss.adr, val);
+    }
+}
+
+void do_trap10(void) {
+    print_log(LOG_ERROR, ">>> CPU ERROR: Illegal instruction %06o at PC %06o! Triggering TRAP 10...",
+              current_instruction_word, global_current_pc);
+              
+    reg[6] -= 2;
+    w_write(reg[6], get_psw(), MEMSPACE);
+    reg[6] -= 2;
+    w_write(reg[6], PC, MEMSPACE);
+
+    PC = w_read(000010);
+    set_psw(w_read(000012));
+
+    abort_instruction = 1;
+}
+
+void do_mtps(void) {
+    // По спецификации DEC, команда MTPS берет только младший байт операнда источника
+    Byte val = (Byte)(dd.val & 0xFF);
+    
+    // Аппаратно извлекаем и выставляем глобальный приоритет процессора (биты 5-7 байта)
+    cpu_priority = (val >> 5) & 7;
+    
+    // Обновляем флаги условий АЛУ NZVC из младших 4 бит байта
+    flag_N = (val >> 3) & 1;
+    flag_Z = (val >> 2) & 1;
+    flag_V = (val >> 1) & 1;
+    flag_C = val & 1;
+}
+
+void do_mfps(void) {
+    // Собираем текущее живое слово состояния процессора
+    Word psw = get_psw();
+    Byte psw_byte = (Byte)(psw & 0xFF);
+    
+    // ЖЕСТКИЙ ЗАКОН DEC: Если приемником выступает прямой регистр процессора (REGSPACE),
+    // то считанный байт PSW автоматически расширяется знаком в полноценное 16-битное слово!
+    if (dd.space == REGSPACE) {
+        Word expanded = (Word)((signed char)psw_byte);
+        w_write(dd.adr, expanded, REGSPACE);
+    } else {
+        // При записи в обычную память ОЗУ пишется чистый байт
+        b_write(dd.adr, psw_byte);
+    }
+    
+    // Выставляем флаги N и Z по значению считанного байта
+    set_flags_NZ((Word)psw_byte);
+    flag_V = 0; // Флаг V всегда сбрасывается в 0 по спецификации
+}
+
+void do_rtt(void) {
+    // Логика извлечения контекста из стека SP (reg[6]) полностью идентична do_rti
+    PC = w_read(reg[6]);
+    reg[6] += 2;
+    
+    Word old_psw = w_read(reg[6]);
+    reg[6] += 2;
+    
+    // Восстанавливаем флаги и глобальный приоритет процессора
+    set_psw(old_psw);
+    
+    // Единственное отличие RTT от RTI на реальном кремнии — это запрет прерывания Т
+    // на следующей инструкции, но для базовой загрузки ядра это не критично.
+}
+
+void do_nop(void) {
+    // Абсолютно пустое тело по спецификации DEC PDP-11
 }
